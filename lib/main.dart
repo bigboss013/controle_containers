@@ -1156,12 +1156,11 @@ class _HomePageState extends State<HomePage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text('Santos Transportes',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800)),
-            ),
+            Text('Santos Transportes',
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             Text(
               '${widget.usuario.nome} - ${roleLabel(widget.usuario.perfil)}',
               style: Theme.of(context).textTheme.bodySmall,
@@ -3039,59 +3038,66 @@ class _EntradaPageState extends State<EntradaPage> {
       children: [
         Text(
           'Registrar entrada',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          style: Theme.of(context)
+              .textTheme
+              .headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Form(
           key: _formKey,
           child: Column(
             children: [
               TextFormField(
                 controller: _codigoController,
+                style: const TextStyle(fontSize: 18),
                 decoration: const InputDecoration(
                   labelText: 'Codigo do conteiner',
                   hintText: 'Ex: MSCU1234567',
                   prefixIcon: Icon(Icons.tag),
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) => obrigatorio(value, 'Informe o codigo.'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _codigoClienteController,
                 readOnly: true,
+                style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
                   labelText: 'Codigo do cliente',
                   hintText: 'Toque para selecionar',
                   prefixIcon: const Icon(Icons.badge_outlined),
                   suffixIcon: const Icon(Icons.arrow_drop_down),
                   border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 onTap: _selecionarCliente,
                 validator: (value) =>
                     obrigatorio(value, 'Informe o codigo do cliente.'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _clienteController,
                 readOnly: true,
+                style: const TextStyle(fontSize: 18),
                 decoration: const InputDecoration(
                   labelText: 'Cliente',
                   prefixIcon: Icon(Icons.business_outlined),
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 onTap: _selecionarCliente,
                 validator: (value) => obrigatorio(value, 'Informe o cliente.'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Row(
                 children: [
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Cheio'),
+                      label: const Text('Cheio', style: TextStyle(fontSize: 16)),
                       selected: _cheio,
                       onSelected: (_) => setState(() => _cheio = true),
                     ),
@@ -3099,7 +3105,7 @@ class _EntradaPageState extends State<EntradaPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Vazio'),
+                      label: const Text('Vazio', style: TextStyle(fontSize: 16)),
                       selected: !_cheio,
                       onSelected: (_) => setState(() => _cheio = false),
                     ),
@@ -3107,15 +3113,17 @@ class _EntradaPageState extends State<EntradaPage> {
                 ],
               ),
               if (_cheio) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _pesoController,
+                  style: const TextStyle(fontSize: 18),
                   decoration: const InputDecoration(
                     labelText: 'Peso do conteiner',
                     hintText: 'Ex: 24500',
                     suffixText: 'kg',
                     prefixIcon: Icon(Icons.scale_outlined),
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -3132,35 +3140,39 @@ class _EntradaPageState extends State<EntradaPage> {
                   },
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 value: _tipo,
+                style: const TextStyle(fontSize: 18),
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
                   prefixIcon: Icon(Icons.view_in_ar_outlined),
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 items: const [
-                  DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
-                  DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
-                  DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
-                  DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                  DropdownMenuItem(value: '20 DRY', child: Text('20 DRY', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: '40 DRY', child: Text('40 DRY', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: '40 HC', child: Text('40 HC', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: 'Reefer', child: Text('Reefer', style: TextStyle(fontSize: 17))),
                 ],
                 onChanged: (value) => setState(() => _tipo = value ?? _tipo),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _observacaoController,
+                style: const TextStyle(fontSize: 18),
                 decoration: const InputDecoration(
                   labelText: 'Observacao',
                   hintText: 'Descreva avarias, lacre, divergencias...',
                   prefixIcon: Icon(Icons.report_problem_outlined),
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 minLines: 2,
                 maxLines: 4,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: _tirarFotoAvaria,
                 icon: const Icon(Icons.photo_camera_outlined),
@@ -3168,6 +3180,7 @@ class _EntradaPageState extends State<EntradaPage> {
                   _fotoAvariaPath == null
                       ? 'Tirar foto de avaria'
                       : 'Trocar foto de avaria',
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
               if (_fotoAvariaPath != null) ...[
@@ -3183,28 +3196,33 @@ class _EntradaPageState extends State<EntradaPage> {
                 ),
               ],
               if (_podeInformarPosicao) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _posicaoController,
+                  style: const TextStyle(fontSize: 18),
                   decoration: const InputDecoration(
                     labelText: 'Posicao no patio',
                     hintText: 'Ex: A-14 ou A5-34',
                     prefixIcon: Icon(Icons.place_outlined),
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                   ),
                   textCapitalization: TextCapitalization.characters,
                   validator: (value) =>
                       obrigatorio(value, 'Informe a posicao.'),
                 ),
               ] else ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 const PermissionNotice(
                   texto:
                       'Perfil Gate registra a entrada sem posicao. A posicao sera definida pelo Conferente.',
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
                 onPressed: _selecionarDeadline,
                 icon: Icon(
                   _deadline != null ? Icons.event_busy : Icons.event_outlined,
@@ -3214,12 +3232,17 @@ class _EntradaPageState extends State<EntradaPage> {
                   _deadline != null
                       ? 'Deadline: ${formatDate(_deadline!)}'
                       : 'Definir Deadline (prazo de entrega)',
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
                   onPressed: _salvar,
                   icon: const Icon(Icons.save_outlined),
                   label: const Text('Salvar entrada'),
