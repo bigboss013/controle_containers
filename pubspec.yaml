@@ -22,7 +22,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo_transportadora.jpg"
+  image_path: "assets/images/santos_transportes_login.jpg"
 
 flutter:
   uses-material-design: true
