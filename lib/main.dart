@@ -1208,6 +1208,9 @@ class _DashboardPageState extends State<DashboardPage> {
             return c.codigo.toUpperCase().contains(q);
           }).toList().firstOrNull;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final tileWidth = (screenWidth - 44) / 2;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1216,6 +1219,7 @@ class _DashboardPageState extends State<DashboardPage> {
           runSpacing: 12,
           children: [
             SummaryTile(
+              width: tileWidth,
               titulo: isConferente ? 'Patio' : 'Armazenados',
               valor: widget.patio.length.toString(),
               icon: Icons.warehouse_outlined,
@@ -1226,6 +1230,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       : 'patio'),
             ),
             SummaryTile(
+              width: tileWidth,
               titulo: isConferente ? 'Embarque' : 'Movimentos',
               valor: isConferente
                   ? _embarqueItems.length.toString()
@@ -1241,6 +1246,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             if (isConferente)
               SummaryTile(
+                width: tileWidth,
                 titulo: 'No-show',
                 valor: _noShowItems.length.toString(),
                 icon: Icons.cancel_outlined,
@@ -1251,6 +1257,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         : 'noshow'),
               ),
             SummaryTile(
+              width: tileWidth,
               titulo: isConferente ? 'Reserva' : 'Total cadastrado',
               valor: isConferente
                   ? _reservaItems.length.toString()
@@ -1936,6 +1943,7 @@ class SummaryTile extends StatelessWidget {
     required this.icon,
     this.onTap,
     this.selected = false,
+    this.width,
   });
 
   final String titulo;
@@ -1943,12 +1951,13 @@ class SummaryTile extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final bool selected;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return SizedBox(
-      width: 168,
+      width: width ?? 168,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -2520,6 +2529,9 @@ class YardMap3D extends StatelessWidget {
 
     final sortedBlocks = layout.keys.toList()..sort();
     final colorScheme = Theme.of(context).colorScheme;
+    final screenW = MediaQuery.of(context).size.width;
+    final cellW = screenW < 400 ? 60.0 : screenW < 600 ? 70.0 : 80.0;
+    final cellH = cellW * 0.5;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -2574,9 +2586,6 @@ class YardMap3D extends StatelessWidget {
                 }
                 maxStack = maxStack.clamp(1, 9);
                 maxHeight = maxHeight.clamp(1, 9);
-
-                final cellW = 70.0;
-                final cellH = 36.0;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
