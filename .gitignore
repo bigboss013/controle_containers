@@ -6,4 +6,5 @@ build/
 .pub-cache/
 .appdata/
 android/local.properties
+*.hprof
 
