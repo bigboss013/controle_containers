@@ -1156,7 +1156,12 @@ class _HomePageState extends State<HomePage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Controle de Conteineres'),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Santos Transportes',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800)),
+            ),
             Text(
               '${widget.usuario.nome} - ${roleLabel(widget.usuario.perfil)}',
               style: Theme.of(context).textTheme.bodySmall,
