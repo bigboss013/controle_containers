@@ -674,6 +674,7 @@ class ContainerItem {
     this.navio,
     this.agendamento,
     this.terminal,
+    this.deadline,
   });
 
   final String codigo;
@@ -691,6 +692,7 @@ class ContainerItem {
   String? navio;
   DateTime? agendamento;
   String? terminal;
+  DateTime? deadline;
 
   Map<String, Object?> toJson() {
     return {
@@ -709,6 +711,7 @@ class ContainerItem {
       'navio': navio,
       'agendamento': agendamento?.toIso8601String(),
       'terminal': terminal,
+      'deadline': deadline?.toIso8601String(),
     };
   }
 
@@ -734,6 +737,9 @@ class ContainerItem {
           ? DateTime.tryParse(json['agendamento'] as String)
           : null,
       terminal: json['terminal'] as String?,
+      deadline: json['deadline'] != null
+          ? DateTime.tryParse(json['deadline'] as String)
+          : null,
     );
   }
 }
@@ -799,6 +805,18 @@ class _HomePageState extends State<HomePage> {
   final List<ContainerItem> _containers = [];
   final List<MovementItem> _movimentos = [];
   int _abaAtual = 0;
+  bool _deadlineBlink = true;
+
+  Color get _deadlineAlertColor {
+    final now = DateTime.now();
+    for (final c in _containers) {
+      if (c.deadline == null || c.status == ContainerStatus.saiu) continue;
+      final diff = c.deadline!.difference(now).inDays;
+      if (diff <= 1) return Colors.red;
+      if (diff <= 3) return Colors.amber;
+    }
+    return Colors.grey;
+  }
 
   List<ContainerItem> get _armazenados => _containers
       .where((item) => item.status == ContainerStatus.armazenado)
@@ -812,6 +830,15 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _carregarDados();
+    _iniciarDeadlineBlink();
+  }
+
+  void _iniciarDeadlineBlink() {
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      setState(() => _deadlineBlink = !_deadlineBlink);
+      _iniciarDeadlineBlink();
+    });
   }
 
   Future<void> _carregarDados() async {
@@ -1056,7 +1083,9 @@ class _HomePageState extends State<HomePage> {
         movimentos: _movimentos,
         containers: _containers,
         onRegistrarNoShow: _registrarNoShow,
+        onReintegrar: _reintegrarNoShow,
       ),
+      DeadlinePage(containers: _containers),
       if (isAdmin)
         UsuariosPage(
           usuarios: widget.usuarios,
@@ -1099,6 +1128,18 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.add_box_outlined),
             selectedIcon: Icon(Icons.add_box),
             label: 'Entrada',
+          ),
+          NavigationDestination(
+            icon: Icon(
+              Icons.warning,
+              color: _deadlineBlink ? _deadlineAlertColor : Colors.grey.shade400,
+              size: 24,
+            ),
+            selectedIcon: Icon(
+              Icons.warning,
+              color: _deadlineAlertColor,
+            ),
+            label: 'Deadline',
           ),
           const NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
@@ -2858,6 +2899,7 @@ class _EntradaPageState extends State<EntradaPage> {
   String? _fotoAvariaPath;
   bool _lendoOcr = false;
   String _tipo = '20 DRY';
+  DateTime? _deadline;
 
   bool get _podeInformarPosicao =>
       widget.perfil == UserRole.conferente ||
@@ -2946,10 +2988,12 @@ class _EntradaPageState extends State<EntradaPage> {
         observacao: _observacaoController.text.trim(),
         fotoAvariaPath: _fotoAvariaPath,
         entrada: DateTime.now(),
+        deadline: _deadline,
       ),
     );
 
     _codigoController.clear();
+    _deadline = null;
     _codigoClienteController.clear();
     _clienteController.clear();
     _pesoController.clear();
@@ -2959,6 +3003,30 @@ class _EntradaPageState extends State<EntradaPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Entrada registrada com sucesso.')),
     );
+  }
+
+  Future<void> _selecionarDeadline() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (date != null) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: _deadline != null
+            ? TimeOfDay.fromDateTime(_deadline!)
+            : const TimeOfDay(hour: 18, minute: 0),
+      );
+      if (time != null) {
+        setState(() {
+          _deadline = DateTime(
+            date.year, date.month, date.day, time.hour, time.minute,
+          );
+        });
+      }
+    }
   }
 
   @override
@@ -3117,6 +3185,19 @@ class _EntradaPageState extends State<EntradaPage> {
                       'Perfil Gate registra a entrada sem posicao. A posicao sera definida pelo Conferente.',
                 ),
               ],
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _selecionarDeadline,
+                icon: Icon(
+                  _deadline != null ? Icons.event_busy : Icons.event_outlined,
+                  color: _deadline != null ? Colors.red : null,
+                ),
+                label: Text(
+                  _deadline != null
+                      ? 'Deadline: ${formatDate(_deadline!)}'
+                      : 'Definir Deadline (prazo de entrega)',
+                ),
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -3140,11 +3221,13 @@ class HistoricoPage extends StatelessWidget {
     required this.movimentos,
     required this.containers,
     required this.onRegistrarNoShow,
+    this.onReintegrar,
   });
 
   final List<MovementItem> movimentos;
   final List<ContainerItem> containers;
   final ValueChanged<ContainerItem> onRegistrarNoShow;
+  final ValueChanged<ContainerItem>? onReintegrar;
 
   @override
   Widget build(BuildContext context) {
@@ -3163,11 +3246,8 @@ class HistoricoPage extends StatelessWidget {
         else
           ...movimentos.map(
             (movimento) {
+              final container = containers.where((c) => c.codigo == movimento.codigo).firstOrNull;
               final isSaida = movimento.tipo == 'Saida';
-              final container = isSaida
-                  ? containers.where((c) => c.codigo == movimento.codigo).firstOrNull
-                  : null;
-              final podeNoShow = isSaida && container != null;
 
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(
@@ -3182,10 +3262,8 @@ class HistoricoPage extends StatelessWidget {
                   '${movimento.descricao}\n${formatDate(movimento.data)}${movimento.usuario.isNotEmpty ? ' • ${movimento.usuario}' : ''}',
                 ),
                 isThreeLine: true,
-                onTap: podeNoShow
-                    ? () => _confirmarNoShow(context, container, movimento.codigo)
-                    : null,
-                trailing: podeNoShow
+                onTap: () => _abrirAcoesContainer(context, container, movimento, isSaida),
+                trailing: isSaida && container != null
                     ? const Icon(Icons.restart_alt, size: 18, color: Colors.orange)
                     : null,
               );
@@ -3195,14 +3273,77 @@ class HistoricoPage extends StatelessWidget {
     );
   }
 
-  void _confirmarNoShow(BuildContext context, ContainerItem container, String codigo) {
+  void _abrirAcoesContainer(BuildContext context, ContainerItem? container, MovementItem movimento, bool isSaida) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Registrar No-show'),
-        content: Text(
-            'O container $codigo saiu do patio mas retornou?\n'
-            'Registrar como No-show para reativa-lo?'),
+        title: Text('${movimento.codigo} - ${movimento.tipo}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(movimento.descricao, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 4),
+            Text(formatDate(movimento.data), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (container != null && isSaida) ...[
+              const SizedBox(height: 12),
+              const Text('Acoes disponiveis:', style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          if (isSaida && container != null) ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                onRegistrarNoShow(container);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Container ${container.codigo} registrado como No-show.')),
+                );
+              },
+              child: const Text('Registrar No-show'),
+            ),
+            if (onReintegrar != null)
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _abrirRetornoPatio(context, container);
+                },
+                child: const Text('Retorno ao patio'),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _abrirRetornoPatio(BuildContext context, ContainerItem container) {
+    final posController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Retorno ao patio - ${container.codigo}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InfoLine(icon: Icons.business_outlined, texto: container.cliente),
+            const SizedBox(height: 12),
+            TextField(
+              controller: posController,
+              decoration: const InputDecoration(
+                labelText: 'Nova posicao no patio',
+                hintText: 'Ex: A-14 ou A5-34',
+                prefixIcon: Icon(Icons.place_outlined),
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -3210,13 +3351,16 @@ class HistoricoPage extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              onRegistrarNoShow(container);
+              final novaPos = posController.text.trim().toUpperCase();
+              if (novaPos.isEmpty) return;
+              container.posicao = novaPos;
+              onReintegrar!(container);
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Container $codigo registrado como No-show.')),
+                SnackBar(content: Text('Container ${container.codigo} retornou ao patio em $novaPos.')),
               );
             },
-            child: const Text('Sim, registrar No-show'),
+            child: const Text('Salvar'),
           ),
         ],
       ),
@@ -3290,6 +3434,87 @@ class PermissionNotice extends StatelessWidget {
           Expanded(child: Text(texto)),
         ],
       ),
+    );
+  }
+}
+
+class DeadlinePage extends StatelessWidget {
+  const DeadlinePage({super.key, required this.containers});
+
+  final List<ContainerItem> containers;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final deadlines = containers
+        .where((c) =>
+            c.deadline != null &&
+            c.status != ContainerStatus.saiu)
+        .toList()
+      ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Deadline - Prazo de entrega',
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Containeres com prazo limite para entrada no terminal.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 12),
+        if (deadlines.isEmpty)
+          const EmptyState(texto: 'Nenhum container com deadline definido.')
+        else
+          ...deadlines.map((c) {
+            final diff = c.deadline!.difference(now).inDays;
+            final color = diff <= 1
+                ? Colors.red
+                : diff <= 3
+                    ? Colors.amber.shade700
+                    : Colors.green;
+            final label = diff <= 1
+                ? 'URGENTE - ${diff}d'
+                : diff <= 3
+                    ? 'Atencao - ${diff}d'
+                    : '${diff}d restantes';
+
+            return Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: color.withValues(alpha: 0.3)),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.warning, color: color, size: 28),
+                title: Text(c.codigo,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                    '${c.cliente} • Deadline: ${formatDate(c.deadline!)}\n$label'),
+                isThreeLine: true,
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    diff <= 1 ? '⚠' : diff <= 3 ? '⚡' : '✓',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
     );
   }
 }
