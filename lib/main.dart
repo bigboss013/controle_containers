@@ -1513,9 +1513,45 @@ class _DashboardPageState extends State<DashboardPage> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fechar'),
           ),
+          if (container.posicao.isNotEmpty &&
+              container.status != ContainerStatus.saiu)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _confirmarSaida(context, container);
+              },
+              child: const Text('Saida',
+                  style: TextStyle(color: Colors.red)),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmarSaida(
+      BuildContext context, ContainerItem container) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar saida'),
+        content: Text(
+            'Registrar saida do container ${container.codigo}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      widget.onSaida(container);
+    }
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
