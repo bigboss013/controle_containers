@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,6 +60,20 @@ class AppUser {
       perfil: roleFromName(json['perfil'] as String?),
     );
   }
+}
+
+class Cliente {
+  Cliente({required this.codigo, required this.nome});
+
+  String codigo;
+  String nome;
+
+  Map<String, Object?> toJson() => {'codigo': codigo, 'nome': nome};
+
+  factory Cliente.fromJson(Map<String, Object?> json) => Cliente(
+        codigo: json['codigo'] as String? ?? '',
+        nome: json['nome'] as String? ?? '',
+      );
 }
 
 class AppShell extends StatefulWidget {
@@ -801,9 +814,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   static const _containersStorageKey = 'containers';
   static const _movementsStorageKey = 'movements';
+  static const _clientesStorageKey = 'clientes';
 
   final List<ContainerItem> _containers = [];
   final List<MovementItem> _movimentos = [];
+  final List<Cliente> _clientes = [];
   int _abaAtual = 0;
   bool _deadlineBlink = true;
 
@@ -830,6 +845,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _carregarDados();
+    _carregarClientes();
     _iniciarDeadlineBlink();
   }
 
@@ -839,6 +855,33 @@ class _HomePageState extends State<HomePage> {
       setState(() => _deadlineBlink = !_deadlineBlink);
       _iniciarDeadlineBlink();
     });
+  }
+
+  Future<void> _carregarClientes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_clientesStorageKey);
+    if (saved != null && saved.isNotEmpty) {
+      final decoded = jsonDecode(saved) as List<dynamic>;
+      for (final item in decoded) {
+        _clientes.add(
+          Cliente.fromJson(Map<String, Object?>.from(item as Map)),
+        );
+      }
+    }
+    if (_clientes.isEmpty) {
+      _clientes.addAll([
+        Cliente(codigo: 'ALFA-001', nome: 'Alfa Logistica'),
+        Cliente(codigo: 'PORTO-109', nome: 'Porto Sul'),
+      ]);
+    }
+  }
+
+  Future<void> _salvarClientes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _clientesStorageKey,
+      jsonEncode(_clientes.map((c) => c.toJson()).toList()),
+    );
   }
 
   Future<void> _carregarDados() async {
@@ -1074,10 +1117,19 @@ class _HomePageState extends State<HomePage> {
         onNoShow: _registrarNoShow,
         onReintegrar: _reintegrarNoShow,
         onReserva: _registrarReserva,
+        onAtualizar: () {
+          setState(() {});
+          _salvarDados();
+        },
       ),
       EntradaPage(
         perfil: widget.usuario.perfil,
+        clientes: _clientes,
         onSalvar: _registrarEntrada,
+        onCadastrarCliente: (Cliente c) {
+          setState(() => _clientes.add(c));
+          _salvarClientes();
+        },
       ),
       DeadlinePage(
         containers: _containers,
@@ -1180,6 +1232,7 @@ class DashboardPage extends StatefulWidget {
     required this.onNoShow,
     required this.onReintegrar,
     required this.onReserva,
+    required this.onAtualizar,
   });
 
   final List<ContainerItem> containers;
@@ -1195,6 +1248,7 @@ class DashboardPage extends StatefulWidget {
   final ValueChanged<ContainerItem> onNoShow;
   final ValueChanged<ContainerItem> onReintegrar;
   final ValueChanged<ContainerItem> onReserva;
+  final VoidCallback onAtualizar;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -1563,6 +1617,16 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
         actions: [
+          if (widget.perfil == UserRole.conferente ||
+              widget.perfil == UserRole.administrador)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _editarContainer(context, container);
+              },
+              child: const Text('Editar',
+                  style: TextStyle(color: Colors.orange)),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fechar'),
@@ -1606,6 +1670,98 @@ class _DashboardPageState extends State<DashboardPage> {
     if (confirm == true) {
       widget.onSaida(container);
     }
+  }
+
+  void _editarContainer(BuildContext context, ContainerItem container) {
+    final terminalCtrl = TextEditingController(text: container.terminal ?? '');
+    final navioCtrl = TextEditingController(text: container.navio ?? '');
+    DateTime? deadline = container.deadline;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Editar ${container.codigo}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: terminalCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Terminal destino',
+                    prefixIcon: Icon(Icons.business),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: navioCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Navio',
+                    prefixIcon: Icon(Icons.directions_boat),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: deadline ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date == null) return;
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: deadline != null
+                          ? TimeOfDay.fromDateTime(deadline!)
+                          : const TimeOfDay(hour: 18, minute: 0),
+                    );
+                    if (time == null) return;
+                    setDialogState(() {
+                      deadline = DateTime(
+                        date.year, date.month, date.day, time.hour, time.minute,
+                      );
+                    });
+                  },
+                  icon: Icon(
+                    deadline != null ? Icons.event_busy : Icons.event_outlined,
+                    color: deadline != null ? Colors.red : null,
+                  ),
+                  label: Text(
+                    deadline != null
+                        ? 'Deadline: ${formatDate(deadline!)}'
+                        : 'Definir Deadline',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                container.terminal = terminalCtrl.text.trim().isEmpty
+                    ? null
+                    : terminalCtrl.text.trim();
+                container.navio = navioCtrl.text.trim().isEmpty
+                    ? null
+                    : navioCtrl.text.trim();
+                container.deadline = deadline;
+                widget.onAtualizar();
+                Navigator.pop(ctx);
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
@@ -2884,10 +3040,18 @@ class YardMap3D extends StatelessWidget {
 }
 
 class EntradaPage extends StatefulWidget {
-  const EntradaPage({super.key, required this.perfil, required this.onSalvar});
+  const EntradaPage({
+    super.key,
+    required this.perfil,
+    required this.clientes,
+    required this.onSalvar,
+    required this.onCadastrarCliente,
+  });
 
   final UserRole perfil;
+  final List<Cliente> clientes;
   final ValueChanged<ContainerItem> onSalvar;
+  final ValueChanged<Cliente> onCadastrarCliente;
 
   @override
   State<EntradaPage> createState() => _EntradaPageState();
@@ -2903,7 +3067,7 @@ class _EntradaPageState extends State<EntradaPage> {
   final _posicaoController = TextEditingController();
   final _imagePicker = ImagePicker();
   String? _fotoAvariaPath;
-  bool _lendoOcr = false;
+  bool _cheio = true;
   String _tipo = '20 DRY';
   DateTime? _deadline;
 
@@ -2922,46 +3086,130 @@ class _EntradaPageState extends State<EntradaPage> {
     super.dispose();
   }
 
-  Future<void> _lerCodigoClientePorFoto() async {
-    final foto = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (foto == null) {
-      return;
-    }
+  void _selecionarCliente() {
+    final searchCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final q = searchCtrl.text.toUpperCase();
+            final clientes = q.isEmpty
+                ? widget.clientes
+                : widget.clientes.where((c) =>
+                    c.codigo.toUpperCase().contains(q) ||
+                    c.nome.toUpperCase().contains(q)).toList();
 
-    setState(() => _lendoOcr = true);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-
-    try {
-      final inputImage = InputImage.fromFilePath(foto.path);
-      final recognizedText = await textRecognizer.processImage(inputImage);
-      final codigo = extractFirstUsefulCode(recognizedText.text);
-
-      if (!mounted) {
-        return;
-      }
-
-      if (codigo == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nao consegui ler o codigo. Digite manualmente.'),
-          ),
+            return AlertDialog(
+              title: const Text('Selecionar cliente'),
+              content: SizedBox(
+                width: 300,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: searchCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Buscar cliente...',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    if (clientes.isEmpty)
+                      const Text('Nenhum cliente encontrado.')
+                    else
+                      SizedBox(
+                        height: 200,
+                        child: ListView(
+                          children: clientes.map((c) => ListTile(
+                            dense: true,
+                            title: Text(c.nome),
+                            subtitle: Text(c.codigo),
+                            onTap: () {
+                              _codigoClienteController.text = c.codigo;
+                              _clienteController.text = c.nome;
+                              Navigator.pop(ctx);
+                            },
+                          )).toList(),
+                        ),
+                      ),
+                    const Divider(),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _cadastrarCliente();
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Cadastrar novo cliente'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            );
+          },
         );
-        return;
-      }
+      },
+    );
+  }
 
-      _codigoClienteController.text = codigo;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Codigo lido: $codigo')),
-      );
-    } finally {
-      await textRecognizer.close();
-      if (mounted) {
-        setState(() => _lendoOcr = false);
-      }
-    }
+  void _cadastrarCliente() {
+    final codCtrl = TextEditingController();
+    final nomeCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cadastrar cliente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: codCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Codigo do cliente',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nomeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nome do cliente',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (codCtrl.text.trim().isEmpty ||
+                  nomeCtrl.text.trim().isEmpty) return;
+              widget.onCadastrarCliente(Cliente(
+                codigo: codCtrl.text.trim().toUpperCase(),
+                nome: nomeCtrl.text.trim(),
+              ));
+              _codigoClienteController.text =
+                  codCtrl.text.trim().toUpperCase();
+              _clienteController.text = nomeCtrl.text.trim();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _tirarFotoAvaria() async {
@@ -2990,7 +3238,7 @@ class _EntradaPageState extends State<EntradaPage> {
         posicao: _podeInformarPosicao
             ? _posicaoController.text.trim().toUpperCase()
             : '',
-        pesoKg: parseWeight(_pesoController.text),
+        pesoKg: _cheio ? parseWeight(_pesoController.text) : null,
         observacao: _observacaoController.text.trim(),
         fotoAvariaPath: _fotoAvariaPath,
         entrada: DateTime.now(),
@@ -3065,61 +3313,76 @@ class _EntradaPageState extends State<EntradaPage> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _codigoClienteController,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Codigo do cliente',
-                  hintText: 'Digite ou leia pela camera',
+                  hintText: 'Toque para selecionar',
                   prefixIcon: const Icon(Icons.badge_outlined),
-                  suffixIcon: IconButton(
-                    tooltip: 'Ler codigo por foto',
-                    onPressed: _lendoOcr ? null : _lerCodigoClientePorFoto,
-                    icon: _lendoOcr
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.document_scanner_outlined),
-                  ),
+                  suffixIcon: const Icon(Icons.arrow_drop_down),
                   border: const OutlineInputBorder(),
                 ),
-                textCapitalization: TextCapitalization.characters,
+                onTap: _selecionarCliente,
                 validator: (value) =>
                     obrigatorio(value, 'Informe o codigo do cliente.'),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _clienteController,
+                readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'Cliente',
                   prefixIcon: Icon(Icons.business_outlined),
                   border: OutlineInputBorder(),
                 ),
+                onTap: _selecionarCliente,
                 validator: (value) => obrigatorio(value, 'Informe o cliente.'),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _pesoController,
-                decoration: const InputDecoration(
-                  labelText: 'Peso do conteiner',
-                  hintText: 'Ex: 24500',
-                  suffixText: 'kg',
-                  prefixIcon: Icon(Icons.scale_outlined),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  final mensagem = obrigatorio(value, 'Informe o peso.');
-                  if (mensagem != null) {
-                    return mensagem;
-                  }
-                  if (parseWeight(value!) == null) {
-                    return 'Informe um peso valido.';
-                  }
-                  return null;
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Cheio'),
+                      selected: _cheio,
+                      onSelected: (_) => setState(() => _cheio = true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Vazio'),
+                      selected: !_cheio,
+                      onSelected: (_) => setState(() => _cheio = false),
+                    ),
+                  ),
+                ],
               ),
+              if (_cheio) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _pesoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Peso do conteiner',
+                    hintText: 'Ex: 24500',
+                    suffixText: 'kg',
+                    prefixIcon: Icon(Icons.scale_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    final mensagem = obrigatorio(value, 'Informe o peso.');
+                    if (mensagem != null) {
+                      return mensagem;
+                    }
+                    if (parseWeight(value!) == null) {
+                      return 'Informe um peso valido.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _tipo,
@@ -3140,7 +3403,7 @@ class _EntradaPageState extends State<EntradaPage> {
               TextFormField(
                 controller: _observacaoController,
                 decoration: const InputDecoration(
-                  labelText: 'Observacao de avarias',
+                  labelText: 'Observacao',
                   hintText: 'Descreva avarias, lacre, divergencias...',
                   prefixIcon: Icon(Icons.report_problem_outlined),
                   border: OutlineInputBorder(),
@@ -3629,23 +3892,6 @@ double? parseWeight(String value) {
     return null;
   }
   return double.tryParse(normalized);
-}
-
-String? extractFirstUsefulCode(String text) {
-  final lines = text
-      .split(RegExp(r'\s+'))
-      .map((line) => line.trim().toUpperCase())
-      .where((line) => line.length >= 4)
-      .toList();
-
-  for (final line in lines) {
-    final cleaned = line.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
-    if (cleaned.length >= 4 && RegExp(r'[0-9]').hasMatch(cleaned)) {
-      return cleaned;
-    }
-  }
-
-  return lines.isEmpty ? null : lines.first;
 }
 
 String roleLabel(UserRole role) {
