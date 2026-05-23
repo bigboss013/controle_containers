@@ -1562,84 +1562,189 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _abrirDetalhesContainer(BuildContext context, ContainerItem container) {
-    showDialog<void>(
+    final codCliCtrl = TextEditingController(text: container.codigoCliente);
+    final cliCtrl = TextEditingController(text: container.cliente);
+    final posCtrl = TextEditingController(text: container.posicao);
+    final obsCtrl = TextEditingController(text: container.observacao);
+    final terminalCtrl = TextEditingController(text: container.terminal ?? '');
+    final navioCtrl = TextEditingController(text: container.navio ?? '');
+    String tipo = container.tipo;
+    DateTime? deadline = container.deadline;
+
+    showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(container.codigo,
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
-            ),
-            Chip(label: Text(container.tipo)),
-            if (container.posicao.isNotEmpty) ...[
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 28,
-                height: 28,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.map, size: 18),
-                  tooltip: 'Mostrar no mapa 3D',
-                  onPressed: () => _abrirDialogMapa(context, container),
-                ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(container.codigo,
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
               ),
+              Chip(label: Text(tipo)),
+              if (container.posicao.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 28, height: 28,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.map, size: 18),
+                    tooltip: 'Mostrar no mapa 3D',
+                    onPressed: () => _abrirDialogMapa(context, container),
+                  ),
+                ),
+              ],
             ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: codCliCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: cliCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Cliente', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: posCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Posicao', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: tipo,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
+                    DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
+                    DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
+                    DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                  ],
+                  onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: terminalCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Terminal destino', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: navioCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Navio', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: deadline ?? DateTime.now(),
+                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date == null) return;
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: deadline != null
+                                ? TimeOfDay.fromDateTime(deadline!)
+                                : const TimeOfDay(hour: 18, minute: 0),
+                          );
+                          if (time == null) return;
+                          setDialogState(() {
+                            deadline = DateTime(
+                              date.year, date.month, date.day, time.hour, time.minute,
+                            );
+                          });
+                        },
+                        icon: Icon(
+                          deadline != null ? Icons.event_busy : Icons.event_outlined,
+                          color: deadline != null ? Colors.red : null,
+                        ),
+                        label: Text(
+                          deadline != null ? formatDate(deadline!) : 'Definir Deadline',
+                        ),
+                      ),
+                    ),
+                    if (deadline != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        tooltip: 'Remover deadline',
+                        onPressed: () => setDialogState(() => deadline = null),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: obsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Observacao', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  minLines: 2, maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            if (container.posicao.isNotEmpty &&
+                container.status != ContainerStatus.saiu)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _confirmarSaida(context, container);
+                },
+                child: const Text('Saida',
+                    style: TextStyle(color: Colors.red)),
+              ),
+            FilledButton(
+              onPressed: () {
+                container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
+                container.cliente = cliCtrl.text.trim();
+                container.posicao = posCtrl.text.trim().toUpperCase();
+                container.tipo = tipo;
+                container.terminal = terminalCtrl.text.trim().isEmpty
+                    ? null : terminalCtrl.text.trim();
+                container.navio = navioCtrl.text.trim().isEmpty
+                    ? null : navioCtrl.text.trim();
+                container.observacao = obsCtrl.text.trim();
+                container.deadline = deadline;
+                Navigator.pop(ctx);
+                widget.onAtualizar();
+              },
+              child: const Text('Salvar'),
+            ),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InfoLine(icon: Icons.business_outlined, texto: container.cliente),
-              InfoLine(icon: Icons.badge_outlined,
-                  texto: 'Cliente: ${emptyLabel(container.codigoCliente)}'),
-              InfoLine(icon: Icons.scale_outlined,
-                  texto: 'Peso: ${weightLabel(container.pesoKg)}'),
-              InfoLine(icon: Icons.place_outlined,
-                  texto: 'Posicao: ${positionLabel(container.posicao)}'),
-              if (container.observacao.isNotEmpty)
-                InfoLine(icon: Icons.report_problem_outlined,
-                    texto: 'Obs: ${container.observacao}'),
-              if (container.terminal != null)
-                InfoLine(icon: Icons.business, texto: 'Terminal: ${container.terminal}'),
-              if (container.navio != null)
-                InfoLine(icon: Icons.directions_boat, texto: 'Navio: ${container.navio}'),
-              if (container.agendamento != null)
-                InfoLine(icon: Icons.schedule,
-                    texto: 'Agendamento: ${formatDate(container.agendamento!)}'),
-              InfoLine(icon: Icons.login,
-                  texto: 'Entrada: ${formatDate(container.entrada)}'),
-            ],
-          ),
-        ),
-        actions: [
-          if (widget.perfil == UserRole.conferente ||
-              widget.perfil == UserRole.administrador)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _editarContainer(context, container);
-              },
-              child: const Text('Editar',
-                  style: TextStyle(color: Colors.orange)),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fechar'),
-          ),
-          if (container.posicao.isNotEmpty &&
-              container.status != ContainerStatus.saiu)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _confirmarSaida(context, container);
-              },
-              child: const Text('Saida',
-                  style: TextStyle(color: Colors.red)),
-            ),
-        ],
       ),
     );
   }
@@ -1668,98 +1773,6 @@ class _DashboardPageState extends State<DashboardPage> {
     if (confirm == true) {
       widget.onSaida(container);
     }
-  }
-
-  void _editarContainer(BuildContext context, ContainerItem container) {
-    final terminalCtrl = TextEditingController(text: container.terminal ?? '');
-    final navioCtrl = TextEditingController(text: container.navio ?? '');
-    DateTime? deadline = container.deadline;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Editar ${container.codigo}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: terminalCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Terminal destino',
-                    prefixIcon: Icon(Icons.business),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: navioCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Navio',
-                    prefixIcon: Icon(Icons.directions_boat),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: deadline ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (date == null) return;
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: deadline != null
-                          ? TimeOfDay.fromDateTime(deadline!)
-                          : const TimeOfDay(hour: 18, minute: 0),
-                    );
-                    if (time == null) return;
-                    setDialogState(() {
-                      deadline = DateTime(
-                        date.year, date.month, date.day, time.hour, time.minute,
-                      );
-                    });
-                  },
-                  icon: Icon(
-                    deadline != null ? Icons.event_busy : Icons.event_outlined,
-                    color: deadline != null ? Colors.red : null,
-                  ),
-                  label: Text(
-                    deadline != null
-                        ? 'Deadline: ${formatDate(deadline!)}'
-                        : 'Definir Deadline',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                container.terminal = terminalCtrl.text.trim().isEmpty
-                    ? null
-                    : terminalCtrl.text.trim();
-                container.navio = navioCtrl.text.trim().isEmpty
-                    ? null
-                    : navioCtrl.text.trim();
-                container.deadline = deadline;
-                widget.onAtualizar();
-                Navigator.pop(ctx);
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
@@ -3563,67 +3576,220 @@ class DeadlinePage extends StatelessWidget {
   }
 
   void _mostrarContainer(BuildContext context, ContainerItem c) {
+    final codCliCtrl = TextEditingController(text: c.codigoCliente);
+    final cliCtrl = TextEditingController(text: c.cliente);
+    final posCtrl = TextEditingController(text: c.posicao);
+    final obsCtrl = TextEditingController(text: c.observacao);
+    final terminalCtrl = TextEditingController(text: c.terminal ?? '');
+    final navioCtrl = TextEditingController(text: c.navio ?? '');
+    String tipo = c.tipo;
+    DateTime? deadline = c.deadline;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(c.codigo,
-            style: const TextStyle(fontWeight: FontWeight.w700)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
             children: [
-              InfoLine(icon: Icons.person, texto: 'Cliente: ${c.cliente}'),
-              InfoLine(icon: Icons.location_on, texto: 'Posicao: ${emptyLabel(c.posicao)}'),
-              InfoLine(icon: Icons.info, texto: 'Status: ${statusLabel(c.status)}'),
-              InfoLine(icon: Icons.access_time, texto: 'Deadline: ${formatDate(c.deadline!)}'),
-              if (c.observacao.isNotEmpty)
-                InfoLine(icon: Icons.notes, texto: 'Obs: ${c.observacao}'),
+              Expanded(
+                child: Text(c.codigo,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 4),
+              Chip(label: Text(tipo)),
+              if (c.posicao.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 28, height: 28,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.map, size: 18),
+                    tooltip: 'Mostrar no mapa 3D',
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _abrirMapa(context, c);
+                    },
+                  ),
+                ),
+              ],
             ],
           ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: codCliCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: cliCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Cliente', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: posCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Posicao', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: tipo,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
+                    DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
+                    DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
+                    DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                  ],
+                  onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: terminalCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Terminal destino', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: navioCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Navio', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: deadline ?? DateTime.now(),
+                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date == null) return;
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: deadline != null
+                                ? TimeOfDay.fromDateTime(deadline!)
+                                : const TimeOfDay(hour: 18, minute: 0),
+                          );
+                          if (time == null) return;
+                          setDialogState(() {
+                            deadline = DateTime(
+                              date.year, date.month, date.day, time.hour, time.minute,
+                            );
+                          });
+                        },
+                        icon: Icon(
+                          deadline != null ? Icons.event_busy : Icons.event_outlined,
+                          color: deadline != null ? Colors.red : null,
+                        ),
+                        label: Text(
+                          deadline != null ? formatDate(deadline!) : 'Definir Deadline',
+                        ),
+                      ),
+                    ),
+                    if (deadline != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        tooltip: 'Remover deadline',
+                        onPressed: () => setDialogState(() => deadline = null),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: obsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Observacao', border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  minLines: 2, maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                c.codigoCliente = codCliCtrl.text.trim().toUpperCase();
+                c.cliente = cliCtrl.text.trim();
+                c.posicao = posCtrl.text.trim().toUpperCase();
+                c.tipo = tipo;
+                c.terminal = terminalCtrl.text.trim().isEmpty
+                    ? null : terminalCtrl.text.trim();
+                c.navio = navioCtrl.text.trim().isEmpty
+                    ? null : navioCtrl.text.trim();
+                c.observacao = obsCtrl.text.trim();
+                c.deadline = deadline;
+                Navigator.pop(ctx);
+                onAtualizar();
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _editarDeadline(context, c);
-            },
-            child:
-                const Text('Editar Deadline', style: TextStyle(color: Colors.orange)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fechar'),
-          ),
-        ],
       ),
     );
   }
 
-  void _editarDeadline(BuildContext context, ContainerItem c) async {
-    final data = await showDatePicker(
+  void _abrirMapa(BuildContext context, ContainerItem c) {
+    showDialog(
       context: context,
-      initialDate: c.deadline!,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx) => AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text('Mapa 3D - ${c.codigo}',
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+        content: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: YardMap3D(
+            containers: containers
+                .where((x) =>
+                    x.posicao.isNotEmpty &&
+                    x.status != ContainerStatus.saiu &&
+                    x.posicao.split('-').isNotEmpty &&
+                    x.posicao.split('-')[0] == c.posicao.split('-')[0])
+                .toList(),
+            highlightCodigo: c.codigo,
+          ),
+        ),
+      ),
     );
-    if (data == null) return;
-
-    final hora = await showTimePicker(
-      context: context,
-      initialTime:
-          TimeOfDay.fromDateTime(c.deadline!),
-    );
-    if (hora == null) return;
-
-    c.deadline = DateTime(
-      data.year,
-      data.month,
-      data.day,
-      hora.hour,
-      hora.minute,
-    );
-    onAtualizar();
   }
 }
 
