@@ -1542,12 +1542,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           onChanged: (v) => setState(() => _patioSearchQuery = v),
         ),
-        const SizedBox(height: 12),
-        YardMap3D(
-          containers: widget.containers,
-          highlightCodigo: _patioSearchQuery.trim().toUpperCase(),
-          onContainerTap: (container) => _abrirDetalhesContainer(context, container),
-        ),
         const SizedBox(height: 16),
         if (patioFiltered.isEmpty)
           const EmptyState(texto: 'Nenhum container encontrado.')
@@ -2517,185 +2511,6 @@ class ContainerCard extends StatelessWidget {
   }
 }
 
-class YardMap extends StatelessWidget {
-  const YardMap({
-    super.key,
-    required this.containers,
-    this.highlightCodigo,
-  });
-
-  final List<ContainerItem> containers;
-  final String? highlightCodigo;
-
-  @override
-  Widget build(BuildContext context) {
-    final armazenados = containers
-        .where((c) =>
-            c.status == ContainerStatus.armazenado && c.posicao.isNotEmpty)
-        .toList();
-
-    if (armazenados.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final layout = <String, Map<String, List<ContainerItem>>>{};
-    for (final c in armazenados) {
-      final (block, row) = parsePosition(c.posicao);
-      final blockKey = row != null ? '$block$row' : block;
-      final rowKey = row != null ? 'Rua $row' : 'Rua 1';
-      layout.putIfAbsent(blockKey, () => {});
-      layout[blockKey]!.putIfAbsent(rowKey, () => []);
-      layout[blockKey]![rowKey]!.add(c);
-    }
-
-    final sortedBlocks = layout.keys.toList()..sort();
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE1E5E8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.map_outlined,
-                  size: 18, color: colorScheme.secondary),
-              const SizedBox(width: 6),
-              Text('Mapa do patio',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: sortedBlocks.map((blockKey) {
-                final rows = layout[blockKey]!;
-                final sortedRows = rows.keys.toList()..sort();
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('Quadra $blockKey',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 12)),
-                      ),
-                      const SizedBox(height: 6),
-                      ...sortedRows.map((rowKey) {
-                        final stacks = rows[rowKey]!;
-                        stacks.sort((a, b) => a.posicao.compareTo(b.posicao));
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(rowKey,
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: stacks.map((c) {
-                                  final isHighlighted =
-                                      c.codigo == highlightCodigo;
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(right: 4),
-                                    child: Tooltip(
-                                      message:
-                                          '${c.codigo}\n${positionLabel(c.posicao)}',
-                                      child: Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: isHighlighted
-                                              ? const Color(0xFF22C55E)
-                                              : const Color(0xFFF1F5F9),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                          border: Border.all(
-                                            color: isHighlighted
-                                                ? const Color(0xFF16A34A)
-                                                : const Color(0xFFE2E8F0),
-                                            width: isHighlighted ? 2 : 1,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              _stackFromPos(c.posicao),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w800,
-                                                color: isHighlighted
-                                                    ? Colors.white
-                                                    : Colors.black87,
-                                              ),
-                                            ),
-                                            Text(
-                                              c.codigo.length > 6
-                                                  ? c.codigo.substring(0, 6)
-                                                  : c.codigo,
-                                              style: TextStyle(
-                                                fontSize: 7,
-                                                color: isHighlighted
-                                                    ? Colors.white70
-                                                    : Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _stackFromPos(String pos) {
-    final parts = pos.split('-');
-    if (parts.length < 2) return '';
-    final sh = parts[1];
-    if (sh.length >= 2) {
-      return 'P${sh[0]} A${sh[1]}';
-    }
-    return pos;
-  }
-}
-
 class YardMap3D extends StatelessWidget {
   const YardMap3D({
     super.key,
@@ -2751,22 +2566,7 @@ class YardMap3D extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.threesixty, size: 18, color: colorScheme.secondary),
-              const SizedBox(width: 6),
-              Text('Mapa 3D do patio (corte lateral)',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              Icon(Icons.arrow_forward, size: 14, color: Colors.orange),
-              Text('Porta',
-                  style: TextStyle(fontSize: 10, color: Colors.orange.shade700)),
-            ],
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Column(
@@ -2800,37 +2600,10 @@ class YardMap3D extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Block header with door direction
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text('Quadra $block',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13)),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Fundo',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade500)),
-                          const SizedBox(width: 12),
-                          Text('Porta',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 4),
-                          Icon(Icons.arrow_forward,
-                              size: 14, color: Colors.orange.shade700),
-                        ],
-                      ),
+                      // Block header
+                      Text('Quadra $block',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 14)),
                       const SizedBox(height: 6),
                       ...sortedRows.map((row) {
                         final stacks = rows[row]!;
@@ -2842,7 +2615,7 @@ class YardMap3D extends StatelessWidget {
                               if (row != null)
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 2),
-                                  child: Text('Rua $row',
+                                  child: Text('$row',
                                       style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
@@ -2950,40 +2723,28 @@ class YardMap3D extends StatelessWidget {
                                                             ),
                                                           ],
                                                   ),
-                                                  child: isEmpty
-                                                      ? Center(
-                                                          child: Text(
-                                                            '$stackNum$heightNum',
-                                                            style: TextStyle(
-                                                                fontSize: 9,
-                                                                color: Colors
-                                                                    .grey
-                                                                    .shade300),
-                                                          ),
-                                                        )
-                                                      : Center(
-                                                          child: Text(
-                                                            c.codigo.length > 6
-                                                                ? c.codigo
-                                                                    .substring(
-                                                                        0, 6)
-                                                                : c.codigo,
-                                                            style: TextStyle(
-                                                              fontSize: 8,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              color: isHighlighted
-                                                                  ? Colors
-                                                                      .white
-                                                                  : Colors
-                                                                      .black87,
-                                                            ),
-                                                            textAlign:
-                                                                TextAlign
-                                                                    .center,
-                                                          ),
-                                                        ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      '$stackNum$heightNum',
+                                                      style: TextStyle(
+                                                        fontSize: isEmpty
+                                                            ? 9
+                                                            : 12,
+                                                        fontWeight: isEmpty
+                                                            ? null
+                                                            : FontWeight
+                                                                .w800,
+                                                        color: isEmpty
+                                                            ? Colors
+                                                                .grey.shade300
+                                                            : isHighlighted
+                                                                ? Colors
+                                                                    .white
+                                                                : Colors
+                                                                    .black87,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ),
                                               );
                                             },
@@ -2991,23 +2752,6 @@ class YardMap3D extends StatelessWidget {
                                         ),
                                       );
                                     }),
-                                    // Door marker
-                                    Container(
-                                      width: 20,
-                                      height: maxHeight * cellH,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.orange.shade300,
-                                            width: 2),
-                                        borderRadius:
-                                            BorderRadius.circular(2),
-                                      ),
-                                      child: Center(
-                                        child: Icon(Icons.door_front_door,
-                                            size: 16,
-                                            color: Colors.orange.shade700),
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
