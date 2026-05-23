@@ -1079,13 +1079,19 @@ class _HomePageState extends State<HomePage> {
         perfil: widget.usuario.perfil,
         onSalvar: _registrarEntrada,
       ),
+      DeadlinePage(
+        containers: _containers,
+        onAtualizar: () {
+          setState(() {});
+          _salvarDados();
+        },
+      ),
       HistoricoPage(
         movimentos: _movimentos,
         containers: _containers,
         onRegistrarNoShow: _registrarNoShow,
         onReintegrar: _reintegrarNoShow,
       ),
-      DeadlinePage(containers: _containers),
       if (isAdmin)
         UsuariosPage(
           usuarios: widget.usuarios,
@@ -3439,9 +3445,11 @@ class PermissionNotice extends StatelessWidget {
 }
 
 class DeadlinePage extends StatelessWidget {
-  const DeadlinePage({super.key, required this.containers});
+  const DeadlinePage(
+      {super.key, required this.containers, required this.onAtualizar});
 
   final List<ContainerItem> containers;
+  final VoidCallback onAtualizar;
 
   @override
   Widget build(BuildContext context) {
@@ -3511,11 +3519,76 @@ class DeadlinePage extends StatelessWidget {
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
+                onTap: () => _mostrarContainer(context, c),
               ),
             );
           }),
       ],
     );
+  }
+
+  void _mostrarContainer(BuildContext context, ContainerItem c) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(c.codigo,
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InfoLine(icon: Icons.person, texto: 'Cliente: ${c.cliente}'),
+              InfoLine(icon: Icons.location_on, texto: 'Posicao: ${emptyLabel(c.posicao)}'),
+              InfoLine(icon: Icons.info, texto: 'Status: ${statusLabel(c.status)}'),
+              InfoLine(icon: Icons.access_time, texto: 'Deadline: ${formatDate(c.deadline!)}'),
+              if (c.observacao.isNotEmpty)
+                InfoLine(icon: Icons.notes, texto: 'Obs: ${c.observacao}'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _editarDeadline(context, c);
+            },
+            child:
+                const Text('Editar Deadline', style: TextStyle(color: Colors.orange)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editarDeadline(BuildContext context, ContainerItem c) async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: c.deadline!,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (data == null) return;
+
+    final hora = await showTimePicker(
+      context: context,
+      initialTime:
+          TimeOfDay.fromDateTime(c.deadline!),
+    );
+    if (hora == null) return;
+
+    c.deadline = DateTime(
+      data.year,
+      data.month,
+      data.day,
+      hora.hour,
+      hora.minute,
+    );
+    onAtualizar();
   }
 }
 
@@ -3588,6 +3661,16 @@ UserRole roleFromName(String? name) {
     'administrador' => UserRole.administrador,
     'gate' => UserRole.gate,
     _ => UserRole.conferente,
+  };
+}
+
+String statusLabel(ContainerStatus status) {
+  return switch (status) {
+    ContainerStatus.armazenado => 'Armazenado',
+    ContainerStatus.reserva => 'Reserva',
+    ContainerStatus.embarcado => 'Embarcado',
+    ContainerStatus.noShow => 'No-show',
+    ContainerStatus.saiu => 'Saiu',
   };
 }
 
