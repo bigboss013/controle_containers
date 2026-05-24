@@ -1011,8 +1011,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
 
-  static const _repoUrl = 'https://github.com/bigboss013/controle_containers';
-
   final List<ContainerItem> _containers = [];
   final List<MovementItem> _movimentos = [];
   final List<Cliente> _clientes = [];
@@ -1076,7 +1074,18 @@ class _HomePageState extends State<HomePage> {
 
       final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '');
       if (_versaoMaior(versaoRemota, versaoAtual)) {
-        final urlDownload = '$_repoUrl/releases/tag/$tag';
+        String? urlDownload;
+        final assets = data['assets'] as List<dynamic>?;
+        if (assets != null) {
+          for (final asset in assets) {
+            final name = asset['name'] as String?;
+            if (name != null && name.endsWith('.apk')) {
+              urlDownload = asset['browser_download_url'] as String?;
+              break;
+            }
+          }
+        }
+        if (urlDownload == null) return;
         if (!mounted) return;
         _mostrarDialogAtualizacao(context, urlDownload);
       }
@@ -1096,7 +1105,7 @@ class _HomePageState extends State<HomePage> {
     return false;
   }
 
-  void _mostrarDialogAtualizacao(BuildContext context, String url) {
+  void _mostrarDialogAtualizacao(BuildContext context, String urlDownload) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1109,7 +1118,7 @@ class _HomePageState extends State<HomePage> {
           ),
           FilledButton.icon(
             onPressed: () async {
-              final uri = Uri.parse(url);
+              final uri = Uri.parse(urlDownload);
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
