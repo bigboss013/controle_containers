@@ -1207,53 +1207,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-}
-                            return;
-                          }
-                          final sink = file.openWrite();
-                          await response.pipe(sink);
-                          await sink.flush();
-                          await sink.close();
-                          client.close();
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            final result = await OpenFilex.open(file.path);
-                            if (result.type != ResultType.done) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Erro ao instalar: ${result.message}'),
-                                ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            setDialogState(() => baixando = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content:
-                                    Text('Erro: $e'),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                icon: baixando
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download),
-                label: Text(baixando ? 'Baixando...' : 'Baixar'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 
   Future<void> _carregarClientes() async {
     _clientes.clear();
