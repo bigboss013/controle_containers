@@ -1188,9 +1188,9 @@ class _HomePageState extends State<HomePage> {
         onDestinationSelected: (index) => setState(() => _abaAtual = index),
         destinations: [
           const NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: 'Patio',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Inicio',
           ),
           const NavigationDestination(
             icon: Icon(Icons.add_box_outlined),
@@ -1450,12 +1450,14 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Row(
           children: [
-            Text(
-              'Todos os containers no patio',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'Todos os containers no patio',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
             const Spacer(),
             TextButton.icon(
@@ -1817,14 +1819,15 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Row(
           children: [
-            Text(
-              'Embarques por terminal',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'Embarques por terminal',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
-            const Spacer(),
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
@@ -1935,18 +1938,19 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Row(
           children: [
-            Text(
-              'No-show pendentes',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'No-show pendentes',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
-            const Spacer(),
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Voltar'),
+              label: const Text('Inicio'),
             ),
           ],
         ),
@@ -1979,18 +1983,19 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Row(
           children: [
-            Text(
-              'Reserva',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'Reserva',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
-            const Spacer(),
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Voltar'),
+              label: const Text('Inicio'),
             ),
           ],
         ),
