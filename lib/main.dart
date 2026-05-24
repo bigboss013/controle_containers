@@ -1580,178 +1580,216 @@ class _DashboardPageState extends State<DashboardPage> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Row(
+        builder: (ctx, setDialogState) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(container.codigo,
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-              ),
-              Chip(label: Text(tipo)),
-              if (container.posicao.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 28, height: 28,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.map, size: 18),
-                    tooltip: 'Mostrar no mapa 3D',
-                    onPressed: () => _abrirDialogMapa(context, container),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(container.codigo,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                   ),
-                ),
-              ],
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: codCliCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Codigo do cliente', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: cliCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Cliente', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: posCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Posicao', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: tipo,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
-                    DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
-                    DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
-                    DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
-                  ],
-                  onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: terminalCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Terminal destino', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: navioCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Navio', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: deadline ?? DateTime.now(),
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date == null) return;
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: deadline != null
-                                ? TimeOfDay.fromDateTime(deadline!)
-                                : const TimeOfDay(hour: 18, minute: 0),
-                          );
-                          if (time == null) return;
-                          setDialogState(() {
-                            deadline = DateTime(
-                              date.year, date.month, date.day, time.hour, time.minute,
-                            );
-                          });
-                        },
-                        icon: Icon(
-                          deadline != null ? Icons.event_busy : Icons.event_outlined,
-                          color: deadline != null ? Colors.red : null,
-                        ),
-                        label: Text(
-                          deadline != null ? formatDate(deadline!) : 'Definir Deadline',
-                        ),
+                  const SizedBox(width: 4),
+                  Chip(label: Text(tipo, style: const TextStyle(fontSize: 12))),
+                  if (container.posicao.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 28, height: 28,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.map, size: 18),
+                        tooltip: 'Mostrar no mapa 3D',
+                        onPressed: () => _abrirDialogMapa(context, container),
                       ),
                     ),
-                    if (deadline != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        tooltip: 'Remover deadline',
-                        onPressed: () => setDialogState(() => deadline = null),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: codCliCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: cliCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Cliente', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: posCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Posicao', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: tipo,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        items: const [
+                          DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
+                          DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
+                          DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
+                          DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                        ],
+                        onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: terminalCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Terminal destino', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: navioCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Navio', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 13),
+                              ),
+                              onPressed: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: deadline ?? DateTime.now(),
+                                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date == null) return;
+                                final time = await showTimePicker(
+                                  context: context,
+                                  initialTime: deadline != null
+                                      ? TimeOfDay.fromDateTime(deadline!)
+                                      : const TimeOfDay(hour: 18, minute: 0),
+                                );
+                                if (time == null) return;
+                                setDialogState(() {
+                                  deadline = DateTime(
+                                    date.year, date.month, date.day, time.hour, time.minute,
+                                  );
+                                });
+                              },
+                              icon: Icon(
+                                deadline != null ? Icons.event_busy : Icons.event_outlined,
+                                color: deadline != null ? Colors.red : null, size: 18,
+                              ),
+                              label: Text(
+                                deadline != null ? formatDate(deadline!) : 'Definir Deadline',
+                              ),
+                            ),
+                          ),
+                          if (deadline != null) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                              tooltip: 'Remover deadline',
+                              onPressed: () => setDialogState(() => deadline = null),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: obsCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Observacao', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        minLines: 2, maxLines: 3,
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: obsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Observacao', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   ),
-                  minLines: 2, maxLines: 3,
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            if (container.posicao.isNotEmpty &&
-                container.status != ContainerStatus.saiu)
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _confirmarSaida(context, container);
-                },
-                child: const Text('Saida',
-                    style: TextStyle(color: Colors.red)),
               ),
-            FilledButton(
-              onPressed: () {
-                container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
-                container.cliente = cliCtrl.text.trim();
-                container.posicao = posCtrl.text.trim().toUpperCase();
-                container.tipo = tipo;
-                container.terminal = terminalCtrl.text.trim().isEmpty
-                    ? null : terminalCtrl.text.trim();
-                container.navio = navioCtrl.text.trim().isEmpty
-                    ? null : navioCtrl.text.trim();
-                container.observacao = obsCtrl.text.trim();
-                container.deadline = deadline;
-                Navigator.pop(ctx);
-                widget.onAtualizar();
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  if (container.posicao.isNotEmpty &&
+                      container.status != ContainerStatus.saiu) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _confirmarSaida(context, container);
+                        },
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Saida'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
+                        container.cliente = cliCtrl.text.trim();
+                        container.posicao = posCtrl.text.trim().toUpperCase();
+                        container.tipo = tipo;
+                        container.terminal = terminalCtrl.text.trim().isEmpty
+                            ? null : terminalCtrl.text.trim();
+                        container.navio = navioCtrl.text.trim().isEmpty
+                            ? null : navioCtrl.text.trim();
+                        container.observacao = obsCtrl.text.trim();
+                        container.deadline = deadline;
+                        Navigator.pop(ctx);
+                        widget.onAtualizar();
+                      },
+                      child: const Text('Salvar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    ),
     );
   }
 
@@ -3594,172 +3632,205 @@ class DeadlinePage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Row(
+        builder: (ctx, setDialogState) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(c.codigo,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(width: 4),
-              Chip(label: Text(tipo)),
-              if (c.posicao.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 28, height: 28,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.map, size: 18),
-                    tooltip: 'Mostrar no mapa 3D',
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _abrirMapa(context, c);
-                    },
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(c.codigo,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                   ),
-                ),
-              ],
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: codCliCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Codigo do cliente', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: cliCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Cliente', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: posCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Posicao', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: tipo,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
-                    DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
-                    DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
-                    DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
-                  ],
-                  onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: terminalCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Terminal destino', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: navioCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Navio', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: deadline ?? DateTime.now(),
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date == null) return;
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: deadline != null
-                                ? TimeOfDay.fromDateTime(deadline!)
-                                : const TimeOfDay(hour: 18, minute: 0),
-                          );
-                          if (time == null) return;
-                          setDialogState(() {
-                            deadline = DateTime(
-                              date.year, date.month, date.day, time.hour, time.minute,
-                            );
-                          });
+                  const SizedBox(width: 4),
+                  Chip(label: Text(tipo, style: const TextStyle(fontSize: 12))),
+                  if (c.posicao.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 28, height: 28,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.map, size: 18),
+                        tooltip: 'Mostrar no mapa 3D',
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _abrirMapa(context, c);
                         },
-                        icon: Icon(
-                          deadline != null ? Icons.event_busy : Icons.event_outlined,
-                          color: deadline != null ? Colors.red : null,
-                        ),
-                        label: Text(
-                          deadline != null ? formatDate(deadline!) : 'Definir Deadline',
-                        ),
                       ),
                     ),
-                    if (deadline != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        tooltip: 'Remover deadline',
-                        onPressed: () => setDialogState(() => deadline = null),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: codCliCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: cliCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Cliente', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: posCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Posicao', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: tipo,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        items: const [
+                          DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
+                          DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
+                          DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
+                          DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                        ],
+                        onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: terminalCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Terminal destino', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: navioCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Navio', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 13),
+                              ),
+                              onPressed: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: deadline ?? DateTime.now(),
+                                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date == null) return;
+                                final time = await showTimePicker(
+                                  context: context,
+                                  initialTime: deadline != null
+                                      ? TimeOfDay.fromDateTime(deadline!)
+                                      : const TimeOfDay(hour: 18, minute: 0),
+                                );
+                                if (time == null) return;
+                                setDialogState(() {
+                                  deadline = DateTime(
+                                    date.year, date.month, date.day, time.hour, time.minute,
+                                  );
+                                });
+                              },
+                              icon: Icon(
+                                deadline != null ? Icons.event_busy : Icons.event_outlined,
+                                color: deadline != null ? Colors.red : null, size: 18,
+                              ),
+                              label: Text(
+                                deadline != null ? formatDate(deadline!) : 'Definir Deadline',
+                              ),
+                            ),
+                          ),
+                          if (deadline != null) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                              tooltip: 'Remover deadline',
+                              onPressed: () => setDialogState(() => deadline = null),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: obsCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Observacao', border: OutlineInputBorder(),
+                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        minLines: 2, maxLines: 3,
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: obsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Observacao', border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   ),
-                  minLines: 2, maxLines: 3,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        c.codigoCliente = codCliCtrl.text.trim().toUpperCase();
+                        c.cliente = cliCtrl.text.trim();
+                        c.posicao = posCtrl.text.trim().toUpperCase();
+                        c.tipo = tipo;
+                        c.terminal = terminalCtrl.text.trim().isEmpty
+                            ? null : terminalCtrl.text.trim();
+                        c.navio = navioCtrl.text.trim().isEmpty
+                            ? null : navioCtrl.text.trim();
+                        c.observacao = obsCtrl.text.trim();
+                        c.deadline = deadline;
+                        Navigator.pop(ctx);
+                        onAtualizar();
+                      },
+                      child: const Text('Salvar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                c.codigoCliente = codCliCtrl.text.trim().toUpperCase();
-                c.cliente = cliCtrl.text.trim();
-                c.posicao = posCtrl.text.trim().toUpperCase();
-                c.tipo = tipo;
-                c.terminal = terminalCtrl.text.trim().isEmpty
-                    ? null : terminalCtrl.text.trim();
-                c.navio = navioCtrl.text.trim().isEmpty
-                    ? null : navioCtrl.text.trim();
-                c.observacao = obsCtrl.text.trim();
-                c.deadline = deadline;
-                Navigator.pop(ctx);
-                onAtualizar();
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
         ),
       ),
+    ),
     );
   }
 
