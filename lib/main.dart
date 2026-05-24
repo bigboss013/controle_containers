@@ -9,6 +9,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1119,8 +1120,14 @@ class _HomePageState extends State<HomePage> {
           FilledButton.icon(
             onPressed: () async {
               final uri = Uri.parse(urlDownload);
-              if (await canLaunchUrl(uri)) {
+              try {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Abra o link no navegador:')), 
+                  );
+                }
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -3267,6 +3274,39 @@ class _EntradaPageState extends State<EntradaPage> {
     setState(() => _fotoAvariaPath = foto.path);
   }
 
+  Future<void> _ocrCodigo() async {
+    final foto = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (foto == null) return;
+
+    final inputImage = InputImage.fromFilePath(foto.path);
+    final textRecognizer = TextRecognizer();
+    try {
+      final result = await textRecognizer.processImage(inputImage);
+      final texto = result.text.toUpperCase();
+      final regex = RegExp(r'[A-Z]{3,4}\d{6,7}');
+      final match = regex.firstMatch(texto);
+      if (match != null) {
+        _codigoController.text = match.group(0)!;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Codigo detectado: ${match.group(0)}')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nenhum codigo de container encontrado na foto.')),
+          );
+        }
+      }
+    } finally {
+      textRecognizer.close();
+    }
+  }
+
   void _salvar() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -3346,12 +3386,17 @@ class _EntradaPageState extends State<EntradaPage> {
               TextFormField(
                 controller: _codigoController,
                 style: const TextStyle(fontSize: 18),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Codigo do conteiner',
                   hintText: 'Ex: MSCU1234567',
-                  prefixIcon: Icon(Icons.tag),
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  prefixIcon: const Icon(Icons.tag),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    tooltip: 'Ler codigo com OCR',
+                    onPressed: _ocrCodigo,
+                  ),
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) => obrigatorio(value, 'Informe o codigo.'),
