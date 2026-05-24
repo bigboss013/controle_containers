@@ -316,7 +316,7 @@ class _LoginPageState extends State<LoginPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 334),
+                  constraints: const BoxConstraints(maxWidth: 267),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: const Color(0xBBFFFFFF),
@@ -324,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
                       border: Border.all(color: const Color(0xFFE1E5E8)),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       child: Form(
                         key: _formKey,
                         child: Column(
