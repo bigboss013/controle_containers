@@ -1825,6 +1825,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final block = container.posicao.split('-').isNotEmpty
         ? container.posicao.split('-')[0]
         : '';
+    final screenH = MediaQuery.of(context).size.height;
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -1847,23 +1848,22 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: YardMap3D(
-                  containers: widget.containers
-                      .where((c) =>
-                          c.posicao.isNotEmpty &&
-                          c.status != ContainerStatus.saiu &&
-                          c.posicao.split('-').isNotEmpty &&
-                          c.posicao.split('-')[0] == block)
-                      .toList(),
-                  highlightCodigo: container.codigo,
-                  onContainerTap: (c) {
-                    Navigator.pop(ctx);
-                    _abrirDetalhesContainer(context, c);
-                  },
-                ),
+            SizedBox(
+              width: 360,
+              height: screenH * 0.55,
+              child: YardMap3D(
+                containers: widget.containers
+                    .where((c) =>
+                        c.posicao.isNotEmpty &&
+                        c.status != ContainerStatus.saiu &&
+                        c.posicao.split('-').isNotEmpty &&
+                        c.posicao.split('-')[0] == block)
+                    .toList(),
+                highlightCodigo: container.codigo,
+                onContainerTap: (c) {
+                  Navigator.pop(ctx);
+                  _abrirDetalhesContainer(context, c);
+                },
               ),
             ),
           ],
