@@ -1822,40 +1822,51 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
+    final block = container.posicao.split('-').isNotEmpty
+        ? container.posicao.split('-')[0]
+        : '';
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        titlePadding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-        title: Row(
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Text('Mapa 3D - ${container.codigo}',
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Mapa 3D - ${container.codigo}',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(ctx),
+            Flexible(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: YardMap3D(
+                  containers: widget.containers
+                      .where((c) =>
+                          c.posicao.isNotEmpty &&
+                          c.status != ContainerStatus.saiu &&
+                          c.posicao.split('-').isNotEmpty &&
+                          c.posicao.split('-')[0] == block)
+                      .toList(),
+                  highlightCodigo: container.codigo,
+                  onContainerTap: (c) {
+                    Navigator.pop(ctx);
+                    _abrirDetalhesContainer(context, c);
+                  },
+                ),
+              ),
             ),
           ],
-        ),
-        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-        content: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: YardMap3D(
-            containers: widget.containers
-                .where((c) =>
-                    c.posicao.isNotEmpty &&
-                    c.status != ContainerStatus.saiu &&
-                    c.posicao.split('-').isNotEmpty &&
-                    c.posicao.split('-')[0] ==
-                        container.posicao.split('-')[0])
-                .toList(),
-            highlightCodigo: container.codigo,
-            onContainerTap: (c) {
-              Navigator.pop(ctx);
-              _abrirDetalhesContainer(context, c);
-            },
-          ),
         ),
       ),
     );
