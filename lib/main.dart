@@ -268,6 +268,11 @@ class _AppShellState extends State<AppShell> {
     await _salvarUsuarios(_usuarios);
   }
 
+  Future<void> _excluirUsuario(String nome) async {
+    await FirestoreDb.removerUsuario(nome);
+    setState(() => _usuarios.removeWhere((u) => u.nome == nome));
+  }
+
   Future<void> _redefinirSenha(String nome, String novaSenha) async {
     final index = _usuarios.indexWhere(
       (usuario) => usuario.nome.toLowerCase() == nome.toLowerCase(),
@@ -319,6 +324,7 @@ class _AppShellState extends State<AppShell> {
       usuarios: _usuarios,
       usuario: usuario,
       onCadastrarUsuario: _cadastrarUsuario,
+      onExcluirUsuario: _excluirUsuario,
       onSair: () => setState(() => _usuario = null),
     );
   }
@@ -628,10 +634,12 @@ class UsuariosPage extends StatefulWidget {
     super.key,
     required this.usuarios,
     required this.onCadastrar,
+    required this.onExcluir,
   });
 
   final List<AppUser> usuarios;
   final Future<void> Function(AppUser usuario) onCadastrar;
+  final Future<void> Function(String nome) onExcluir;
 
   @override
   State<UsuariosPage> createState() => _UsuariosPageState();
@@ -682,6 +690,33 @@ class _UsuariosPageState extends State<UsuariosPage> {
   bool _nomeJaCadastrado(String nome) {
     return widget.usuarios.any(
       (usuario) => usuario.nome.toLowerCase() == nome.toLowerCase(),
+    );
+  }
+
+  Future<void> _confirmarExclusao(AppUser usuario) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir usuario'),
+        content: Text('Deseja excluir o usuario "${usuario.nome}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true) return;
+    await widget.onExcluir(usuario.nome);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Usuario "${usuario.nome}" excluido.')),
     );
   }
 
@@ -823,6 +858,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
             leading: const CircleAvatar(child: Icon(Icons.person_outline)),
             title: Text(usuario.nome),
             subtitle: Text(roleLabel(usuario.perfil)),
+            onTap: () => _confirmarExclusao(usuario),
           ),
         ),
       ],
@@ -959,12 +995,14 @@ class HomePage extends StatefulWidget {
     required this.usuarios,
     required this.usuario,
     required this.onCadastrarUsuario,
+    required this.onExcluirUsuario,
     required this.onSair,
   });
 
   final List<AppUser> usuarios;
   final AppUser usuario;
   final Future<void> Function(AppUser usuario) onCadastrarUsuario;
+  final Future<void> Function(String nome) onExcluirUsuario;
   final VoidCallback onSair;
 
   @override
@@ -1347,6 +1385,7 @@ class _HomePageState extends State<HomePage> {
         UsuariosPage(
           usuarios: widget.usuarios,
           onCadastrar: widget.onCadastrarUsuario,
+          onExcluir: widget.onExcluirUsuario,
         ),
     ];
 
