@@ -8,8 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1153,14 +1153,12 @@ class _HomePageState extends State<HomePage> {
                           client.close();
                           if (ctx.mounted) {
                             Navigator.pop(ctx);
-                            final fileUri = Uri.file(file.path);
-                            if (await canLaunchUrl(fileUri)) {
-                              await launchUrl(fileUri);
-                            } else {
+                            final result = await OpenFilex.open(file.path);
+                            if (result.type != ResultType.done) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                      'APK baixado em: ${file.path}'),
+                                      'Erro ao instalar: ${result.message}'),
                                 ),
                               );
                             }
