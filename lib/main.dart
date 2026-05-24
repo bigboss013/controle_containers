@@ -1789,8 +1789,8 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             SizedBox(
-              width: 360,
-              height: screenH * 0.55,
+              width: 300,
+              height: (screenH - 140) * 0.5,
               child: YardMap3D(
                 containers: widget.containers
                     .where((c) =>
@@ -3809,35 +3809,47 @@ class DeadlinePage extends StatelessWidget {
   }
 
   void _abrirMapa(BuildContext context, ContainerItem c) {
+    final block = c.posicao.split('-').isNotEmpty
+        ? c.posicao.split('-')[0]
+        : '';
+    final screenH = MediaQuery.of(context).size.height;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        titlePadding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-        title: Row(
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 60),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Text('Mapa 3D - ${c.codigo}',
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Mapa 3D - ${c.codigo}',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(ctx),
+            SizedBox(
+              width: 300,
+              height: (screenH - 180) * 0.5,
+              child: YardMap3D(
+                containers: containers
+                    .where((x) =>
+                        x.posicao.isNotEmpty &&
+                        x.status != ContainerStatus.saiu &&
+                        x.posicao.split('-').isNotEmpty &&
+                        x.posicao.split('-')[0] == block)
+                    .toList(),
+                highlightCodigo: c.codigo,
+              ),
             ),
           ],
-        ),
-        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-        content: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: YardMap3D(
-            containers: containers
-                .where((x) =>
-                    x.posicao.isNotEmpty &&
-                    x.status != ContainerStatus.saiu &&
-                    x.posicao.split('-').isNotEmpty &&
-                    x.posicao.split('-')[0] == c.posicao.split('-')[0])
-                .toList(),
-            highlightCodigo: c.codigo,
-          ),
         ),
       ),
     );
