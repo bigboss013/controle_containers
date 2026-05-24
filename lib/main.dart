@@ -2443,30 +2443,51 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
+            SizedBox(
+              width: 110,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _abrirDetalhesContainer(context, item);
+                },
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Cancelar'),
+                ),
+              ),
             ),
-            FilledButton(
-              onPressed: () {
-                final navio = navioCtrl.text.trim();
-                if (navio.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Informe o nome do navio.')),
+            SizedBox(
+              width: 160,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                ),
+                onPressed: () {
+                  final navio = navioCtrl.text.trim();
+                  if (navio.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Informe o nome do navio.')),
+                    );
+                    return;
+                  }
+                  final agendamento = DateTime(
+                    dataAgendamento.year,
+                    dataAgendamento.month,
+                    dataAgendamento.day,
+                    horaAgendamento.hour,
+                    horaAgendamento.minute,
                   );
-                  return;
-                }
-                final agendamento = DateTime(
-                  dataAgendamento.year,
-                  dataAgendamento.month,
-                  dataAgendamento.day,
-                  horaAgendamento.hour,
-                  horaAgendamento.minute,
-                );
-                widget.onEmbarque(item, terminalCtrl.text.trim(), navio, agendamento);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Confirmar embarque'),
+                  widget.onEmbarque(item, terminalCtrl.text.trim(), navio, agendamento);
+                  Navigator.pop(ctx);
+                },
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Confirmar embarque'),
+                ),
+              ),
             ),
           ],
         ),
