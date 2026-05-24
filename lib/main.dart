@@ -168,8 +168,14 @@ class _AppShellState extends State<AppShell> {
     final usuario = _usuario;
 
     if (_carregandoUsuarios) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Image.asset(
+            'assets/images/icone_santos.jpg',
+            fit: BoxFit.contain,
+            width: 300,
+          ),
+        ),
       );
     }
 
@@ -310,7 +316,7 @@ class _LoginPageState extends State<LoginPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(maxWidth: 380),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: const Color(0xBBFFFFFF),
@@ -318,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
                       border: Border.all(color: const Color(0xFFE1E5E8)),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(14),
                       child: Form(
                         key: _formKey,
                         child: Column(
