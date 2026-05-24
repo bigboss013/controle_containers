@@ -2,8 +2,6 @@ name: Build APK
 on:
   push:
     branches: [ main ]
-permissions:
-  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,7 +14,9 @@ jobs:
       - run: flutter build apk --release
       - name: Get version
         id: version
-        run: echo "version=$(grep 'version: ' pubspec.yaml | head -1 | sed 's/version: //')" >> $GITHUB_OUTPUT
+        run: |-
+          VERSION=$(grep 'version: ' pubspec.yaml | head -1 | sed 's/version: //')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
