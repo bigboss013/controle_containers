@@ -1303,14 +1303,6 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final isConferente = widget.perfil == UserRole.conferente;
-    final filtered = _searchQuery.isEmpty
-        ? widget.patio
-        : widget.patio.where((c) {
-            final q = _searchQuery.toUpperCase();
-            return c.codigo.toUpperCase().contains(q) ||
-                c.cliente.toUpperCase().contains(q) ||
-                c.posicao.toUpperCase().contains(q);
-          }).toList();
 
     final ContainerItem? searchedItem = _searchQuery.isEmpty
         ? null
@@ -1430,60 +1422,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          Text(
-            'Conteineres no patio',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          if (widget.patio.isEmpty)
-            const EmptyState(texto: 'Nenhum conteiner no patio.')
-          else if (filtered.isEmpty)
-            const EmptyState(texto: 'Nenhum resultado para esta busca.')
-          else
-            ...filtered.map(
-              (item) => ContainerCard(
-                item: item,
-                podeMover: widget.podeMover,
-                podeEmbarcar: isConferente && item.status != ContainerStatus.embarcado,
-                podeReservar: isConferente && item.status == ContainerStatus.armazenado,
-                onSaida: () => widget.onSaida(item),
-                onMover: (novaPosicao) =>
-                    widget.onMover(item, novaPosicao),
-                onEmbarque: () =>
-                    _confirmarEmbarque(context, item),
-                onReserva: () => widget.onReserva(item),
-                onAbrirMapa: () => _abrirDialogMapa(context, item),
-              ),
-            ),
-          if (isConferente && _noShowItems.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              'No-show pendentes',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            ..._noShowItems.map(
-              (item) => ContainerCard(
-                item: item,
-                podeMover: false,
-                podeEmbarcar: false,
-                podeReservar: false,
-                onSaida: () {},
-                onMover: (_) {},
-                onEmbarque: () {},
-                noShowActions: true,
-                onReintegrar: () => widget.onReintegrar(item),
-                onRegistrarNoShow: () => widget.onNoShow(item),
-              ),
-            ),
-          ],
         ] else if (_selectedSection == 'patio') ...[
           _buildPatioSection(),
         ] else if (_selectedSection == 'embarque') ...[
@@ -1523,7 +1461,7 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Voltar'),
+              label: const Text('Inicio'),
             ),
           ],
         ),
@@ -1890,7 +1828,7 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Voltar'),
+              label: const Text('Inicio'),
             ),
           ],
         ),
