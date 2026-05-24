@@ -1456,6 +1456,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 onEmbarque: () =>
                     _confirmarEmbarque(context, item),
                 onReserva: () => widget.onReserva(item),
+                onAbrirMapa: () => _abrirDialogMapa(context, item),
               ),
             ),
           if (isConferente && _noShowItems.isNotEmpty) ...[
@@ -1561,6 +1562,7 @@ class _DashboardPageState extends State<DashboardPage> {
               onMover: (novaPosicao) => widget.onMover(item, novaPosicao),
               onEmbarque: () => _confirmarEmbarque(context, item),
               onReserva: () => widget.onReserva(item),
+              onAbrirMapa: () => _abrirDialogMapa(context, item),
             ),
           ),
       ],
@@ -2057,6 +2059,7 @@ class _DashboardPageState extends State<DashboardPage> {
               onMover: (novaPosicao) => widget.onMover(item, novaPosicao),
               onEmbarque: () => _confirmarEmbarque(context, item),
               onReserva: null,
+              onAbrirMapa: () => _abrirDialogMapa(context, item),
             ),
           ),
       ],
@@ -2265,6 +2268,7 @@ class ContainerCard extends StatelessWidget {
     this.noShowActions = false,
     this.onReintegrar,
     this.onRegistrarNoShow,
+    this.onAbrirMapa,
   });
 
   final ContainerItem item;
@@ -2278,6 +2282,7 @@ class ContainerCard extends StatelessWidget {
   final bool noShowActions;
   final VoidCallback? onReintegrar;
   final VoidCallback? onRegistrarNoShow;
+  final VoidCallback? onAbrirMapa;
 
   @override
   Widget build(BuildContext context) {
@@ -2435,7 +2440,22 @@ class ContainerCard extends StatelessWidget {
               child: Text(item.codigo,
                   style: const TextStyle(fontWeight: FontWeight.w800)),
             ),
-            Chip(label: Text(item.tipo)),
+             Chip(label: Text(item.tipo)),
+              if (item.posicao.isNotEmpty && onAbrirMapa != null) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 28, height: 28,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.map, size: 18),
+                    tooltip: 'Mostrar no mapa 3D',
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      onAbrirMapa!.call();
+                    },
+                  ),
+                ),
+              ],
           ],
         ),
         content: SingleChildScrollView(
