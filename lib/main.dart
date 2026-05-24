@@ -1757,7 +1757,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final block = container.posicao.split('-').isNotEmpty
         ? container.posicao.split('-')[0]
         : '';
-    final screenH = MediaQuery.of(context).size.height;
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -1780,9 +1779,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            SizedBox(
-              width: 300,
-              height: (screenH - 140) * 0.5,
+            Flexible(
               child: YardMap3D(
                 containers: widget.containers
                     .where((c) =>
