@@ -1398,7 +1398,32 @@ class _HomePageState extends State<HomePage> {
         ),
     ];
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Sair'),
+            content: const Text('Tem certeza que deseja sair do app?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Não'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Sim'),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true) {
+          exit(0);
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1463,7 +1488,8 @@ class _HomePageState extends State<HomePage> {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 
