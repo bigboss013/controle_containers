@@ -3,9 +3,145 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
-void main() {
+class FirestoreDb {
+  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+
+  static Future<void> initDefaultData() async {
+    final userSnapshot = await _db.collection('usuarios').limit(1).get();
+    if (userSnapshot.docs.isNotEmpty) return;
+    await _db.collection('usuarios').doc('admin').set({
+      'senha': 'admin123', 'perfil': 'administrador',
+    });
+    await _db.collection('clientes').doc('ALFA-001').set({
+      'codigo': 'ALFA-001', 'nome': 'Alfa Logistica',
+    });
+    await _db.collection('clientes').doc('PORTO-109').set({
+      'codigo': 'PORTO-109', 'nome': 'Porto Sul',
+    });
+  }
+
+  static Future<List<AppUser>> carregarUsuarios() async {
+    final snapshot = await _db.collection('usuarios').get();
+    return snapshot.docs.map((doc) {
+      final d = doc.data();
+      return AppUser(
+        nome: doc.id,
+        senha: d['senha'] as String? ?? '',
+        perfil: UserRole.values.firstWhere(
+          (r) => r.name == d['perfil'], orElse: () => UserRole.gate,
+        ),
+      );
+    }).toList();
+  }
+
+  static Future<void> salvarUsuario(AppUser user) async {
+    await _db.collection('usuarios').doc(user.nome).set({
+      'senha': user.senha, 'perfil': user.perfil.name,
+    });
+  }
+
+  static Future<void> removerUsuario(String nome) async {
+    await _db.collection('usuarios').doc(nome).delete();
+  }
+
+  static Future<List<ContainerItem>> carregarContainers() async {
+    final snapshot = await _db.collection('containers').get();
+    return snapshot.docs.map((doc) {
+      final d = doc.data();
+      return ContainerItem(
+        codigo: doc.id,
+        codigoCliente: d['codigoCliente'] as String? ?? '',
+        cliente: d['cliente'] as String? ?? '',
+        tipo: d['tipo'] as String? ?? '20 DRY',
+        posicao: d['posicao'] as String? ?? '',
+        entrada: DateTime.tryParse(d['entrada'] as String? ?? '') ?? DateTime.now(),
+        saida: d['saida'] != null ? DateTime.tryParse(d['saida'] as String) : null,
+        status: ContainerStatus.values.firstWhere(
+          (s) => s.name == d['status'], orElse: () => ContainerStatus.armazenado,
+        ),
+        pesoKg: (d['pesoKg'] as num?)?.toDouble(),
+        observacao: d['observacao'] as String? ?? '',
+        fotoAvariaPath: d['fotoAvariaPath'] as String?,
+        deadline: d['deadline'] != null ? DateTime.tryParse(d['deadline'] as String) : null,
+        terminal: d['terminal'] as String?,
+        navio: d['navio'] as String?,
+        agendamento: d['agendamento'] != null ? DateTime.tryParse(d['agendamento'] as String) : null,
+        noShowCount: d['noShowCount'] as int? ?? 0,
+      );
+    }).toList();
+  }
+
+  static Future<void> salvarContainer(ContainerItem c) async {
+    await _db.collection('containers').doc(c.codigo).set({
+      'codigoCliente': c.codigoCliente, 'cliente': c.cliente,
+      'tipo': c.tipo, 'posicao': c.posicao,
+      'entrada': c.entrada.toIso8601String(),
+      'saida': c.saida?.toIso8601String(),
+      'status': c.status.name, 'pesoKg': c.pesoKg,
+      'observacao': c.observacao, 'fotoAvariaPath': c.fotoAvariaPath,
+      'deadline': c.deadline?.toIso8601String(),
+      'terminal': c.terminal, 'navio': c.navio,
+      'agendamento': c.agendamento?.toIso8601String(),
+      'noShowCount': c.noShowCount,
+    });
+  }
+
+  static Future<void> removerContainer(String codigo) async {
+    await _db.collection('containers').doc(codigo).delete();
+  }
+
+  static Future<List<MovementItem>> carregarMovimentos() async {
+    final snapshot = await _db.collection('movimentos')
+        .orderBy('data', descending: true).get();
+    return snapshot.docs.map((doc) {
+      final d = doc.data();
+      return MovementItem(
+        tipo: d['tipo'] as String? ?? '',
+        codigo: d['codigo'] as String? ?? '',
+        descricao: d['descricao'] as String? ?? '',
+        data: DateTime.tryParse(d['data'] as String? ?? '') ?? DateTime.now(),
+        usuario: d['usuario'] as String? ?? '',
+      );
+    }).toList();
+  }
+
+  static Future<void> registrarMovimento(MovementItem m) async {
+    await _db.collection('movimentos').add({
+      'tipo': m.tipo, 'codigo': m.codigo,
+      'descricao': m.descricao,
+      'data': m.data.toIso8601String(),
+      'usuario': m.usuario,
+    });
+  }
+
+  static Future<List<Cliente>> carregarClientes() async {
+    final snapshot = await _db.collection('clientes').get();
+    return snapshot.docs.map((doc) {
+      final d = doc.data();
+      return Cliente(codigo: doc.id, nome: d['nome'] as String? ?? '');
+    }).toList();
+  }
+
+  static Future<void> salvarCliente(Cliente c) async {
+    await _db.collection('clientes').doc(c.codigo).set({'nome': c.nome});
+  }
+
+  static Future<void> removerCliente(String codigo) async {
+    await _db.collection('clientes').doc(codigo).delete();
+  }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await FirestoreDb.initDefaultData();
   runApp(const ControleContainersApp());
 }
 
@@ -84,59 +220,47 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _usersStorageKey = 'usuarios_cadastrados';
-
   AppUser? _usuario;
   final List<AppUser> _usuarios = [];
   bool _carregandoUsuarios = true;
+  String? _ultimoUsuarioNome;
 
   @override
   void initState() {
     super.initState();
     _carregarUsuarios();
+    _carregarUltimoUsuario();
+  }
+
+  Future<void> _carregarUltimoUsuario() async {
+    final prefs = await SharedPreferences.getInstance();
+    _ultimoUsuarioNome = prefs.getString('ultimo_usuario');
+  }
+
+  Future<void> _salvarUltimoUsuario(String nome) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ultimo_usuario', nome);
   }
 
   Future<void> _carregarUsuarios() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedUsers = prefs.getString(_usersStorageKey);
-    final loadedUsers = <AppUser>[];
-
-    if (savedUsers != null && savedUsers.isNotEmpty) {
-      final decoded = jsonDecode(savedUsers) as List<dynamic>;
-      loadedUsers.addAll(
-        decoded.map(
-          (item) => AppUser.fromJson(Map<String, Object?>.from(item as Map)),
-        ),
-      );
+    final loaded = await FirestoreDb.carregarUsuarios();
+    if (loaded.isEmpty) {
+      await FirestoreDb.initDefaultData();
+      loaded.addAll(await FirestoreDb.carregarUsuarios());
     }
-
-    if (loadedUsers.isEmpty) {
-      loadedUsers.add(
-        const AppUser(
-          nome: 'admin',
-          senha: 'admin123',
-          perfil: UserRole.administrador,
-        ),
-      );
-      await _salvarUsuarios(loadedUsers);
-    }
-
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _usuarios
         ..clear()
-        ..addAll(loadedUsers);
+        ..addAll(loaded);
       _carregandoUsuarios = false;
     });
   }
 
   Future<void> _salvarUsuarios(List<AppUser> usuarios) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(usuarios.map((usuario) => usuario.toJson()).toList());
-    await prefs.setString(_usersStorageKey, encoded);
+    for (final u in usuarios) {
+      await FirestoreDb.salvarUsuario(u);
+    }
   }
 
   Future<void> _cadastrarUsuario(AppUser novoUsuario) async {
@@ -182,7 +306,9 @@ class _AppShellState extends State<AppShell> {
     if (usuario == null) {
       return LoginPage(
         usuarios: _usuarios,
+        ultimoUsuarioNome: _ultimoUsuarioNome,
         onEntrar: (novoUsuario) {
+          _salvarUltimoUsuario(novoUsuario.nome);
           setState(() => _usuario = novoUsuario);
         },
         onRedefinirSenha: _redefinirSenha,
@@ -202,11 +328,13 @@ class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
     required this.usuarios,
+    this.ultimoUsuarioNome,
     required this.onEntrar,
     required this.onRedefinirSenha,
   });
 
   final List<AppUser> usuarios;
+  final String? ultimoUsuarioNome;
   final ValueChanged<AppUser> onEntrar;
   final Future<void> Function(String nome, String novaSenha) onRedefinirSenha;
 
@@ -219,15 +347,36 @@ class _LoginPageState extends State<LoginPage> {
   final _nomeController = TextEditingController();
   final _senhaController = TextEditingController();
   final _confirmarSenhaController = TextEditingController();
+  final _localAuth = LocalAuthentication();
   bool _redefinindoSenha = false;
   bool _ocultarSenha = true;
+  bool _biometricaDisponivel = false;
 
   @override
-  void dispose() {
-    _nomeController.dispose();
-    _senhaController.dispose();
-    _confirmarSenhaController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _verificarBiometria();
+  }
+
+  Future<void> _verificarBiometria() async {
+    final disponivel = await _localAuth.canCheckBiometrics;
+    if (mounted) setState(() => _biometricaDisponivel = disponivel);
+  }
+
+  Future<void> _entrarBiometrico() async {
+    final autenticado = await _localAuth.authenticate(
+      localizedReason: 'Use sua biometria para entrar',
+    );
+    if (!autenticado) return;
+
+    final nome = widget.ultimoUsuarioNome;
+    if (nome == null) return;
+
+    final usuario = widget.usuarios.cast<AppUser?>().firstWhere(
+      (u) => u!.nome.toLowerCase() == nome.toLowerCase(),
+      orElse: () => null,
+    );
+    if (usuario != null) widget.onEntrar(usuario);
   }
 
   void _entrar() {
@@ -446,6 +595,19 @@ class _LoginPageState extends State<LoginPage> {
                                     : 'Redefinir senha',
                               ),
                             ),
+                            if (!_redefinindoSenha &&
+                                _biometricaDisponivel &&
+                                widget.ultimoUsuarioNome != null) ...[
+                              const SizedBox(height: 5),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _entrarBiometrico,
+                                  icon: const Icon(Icons.fingerprint),
+                                  label: const Text('Entrar com biometria'),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -810,9 +972,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _containersStorageKey = 'containers';
-  static const _movementsStorageKey = 'movements';
-  static const _clientesStorageKey = 'clientes';
+
+  static const _repoUrl = 'https://github.com/bigboss013/controle_containers';
 
   final List<ContainerItem> _containers = [];
   final List<MovementItem> _movimentos = [];
@@ -845,6 +1006,7 @@ class _HomePageState extends State<HomePage> {
     _carregarDados();
     _carregarClientes();
     _iniciarDeadlineBlink();
+    _verificarAtualizacao();
   }
 
   void _iniciarDeadlineBlink() {
@@ -855,17 +1017,77 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _carregarClientes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_clientesStorageKey);
-    if (saved != null && saved.isNotEmpty) {
-      final decoded = jsonDecode(saved) as List<dynamic>;
-      for (final item in decoded) {
-        _clientes.add(
-          Cliente.fromJson(Map<String, Object?>.from(item as Map)),
-        );
+  Future<void> _verificarAtualizacao() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final versaoAtual = info.version;
+
+      final client = HttpClient();
+      final request = await client.getUrl(
+        Uri.parse('https://api.github.com/repos/bigboss013/controle_containers/releases/latest'),
+      );
+      request.headers.set('Accept', 'application/vnd.github.v3+json');
+      request.headers.set('User-Agent', 'controle_containers');
+      final response = await request.close();
+      if (response.statusCode != 200) return;
+
+      final body = await response.transform(utf8.decoder).join();
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final tag = data['tag_name'] as String?;
+      if (tag == null) return;
+
+      final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '');
+      if (_versaoMaior(versaoRemota, versaoAtual)) {
+        final urlDownload = '$_repoUrl/releases/tag/$tag';
+        if (!mounted) return;
+        _mostrarDialogAtualizacao(context, urlDownload);
       }
+    } catch (_) {}
+  }
+
+  bool _versaoMaior(String a, String b) {
+    final partsA = a.split('.');
+    final partsB = b.split('.');
+    final maxLen = partsA.length > partsB.length ? partsA.length : partsB.length;
+    for (var i = 0; i < maxLen; i++) {
+      final va = i < partsA.length ? int.tryParse(partsA[i]) ?? 0 : 0;
+      final vb = i < partsB.length ? int.tryParse(partsB[i]) ?? 0 : 0;
+      if (va > vb) return true;
+      if (va < vb) return false;
     }
+    return false;
+  }
+
+  void _mostrarDialogAtualizacao(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Atualizacao disponivel'),
+        content: const Text('Nova versao disponivel para download.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Agora nao'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(url);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            icon: const Icon(Icons.download),
+            label: const Text('Baixar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _carregarClientes() async {
+    _clientes.clear();
+    _clientes.addAll(await FirestoreDb.carregarClientes());
     if (_clientes.isEmpty) {
       _clientes.addAll([
         Cliente(codigo: 'ALFA-001', nome: 'Alfa Logistica'),
@@ -875,35 +1097,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _salvarClientes() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _clientesStorageKey,
-      jsonEncode(_clientes.map((c) => c.toJson()).toList()),
-    );
+    for (final c in _clientes) {
+      await FirestoreDb.salvarCliente(c);
+    }
   }
 
   Future<void> _carregarDados() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedContainers = prefs.getString(_containersStorageKey);
-    final savedMovements = prefs.getString(_movementsStorageKey);
-
-    if (savedContainers != null && savedContainers.isNotEmpty) {
-      final decoded = jsonDecode(savedContainers) as List<dynamic>;
-      for (final item in decoded) {
-        _containers.add(
-          ContainerItem.fromJson(Map<String, Object?>.from(item as Map)),
-        );
-      }
-    }
-
-    if (savedMovements != null && savedMovements.isNotEmpty) {
-      final decoded = jsonDecode(savedMovements) as List<dynamic>;
-      for (final item in decoded) {
-        _movimentos.add(
-          MovementItem.fromJson(Map<String, Object?>.from(item as Map)),
-        );
-      }
-    }
+    _containers.clear();
+    _containers.addAll(await FirestoreDb.carregarContainers());
+    _movimentos.clear();
+    _movimentos.addAll(await FirestoreDb.carregarMovimentos());
 
     if (_containers.isEmpty) {
       final usuarioNome = widget.usuario.nome;
@@ -939,6 +1142,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       }
+      await _salvarDados();
     }
 
     if (!mounted) return;
@@ -946,15 +1150,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _salvarDados() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _containersStorageKey,
-      jsonEncode(_containers.map((c) => c.toJson()).toList()),
-    );
-    await prefs.setString(
-      _movementsStorageKey,
-      jsonEncode(_movimentos.map((m) => m.toJson()).toList()),
-    );
+    for (final c in _containers) {
+      await FirestoreDb.salvarContainer(c);
+    }
+    for (final m in _movimentos) {
+      await FirestoreDb.registrarMovimento(m);
+    }
   }
 
   void _registrarEntrada(ContainerItem item) {

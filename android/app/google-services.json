@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "346700863655",
+    "project_id": "santos-transportes",
+    "storage_bucket": "santos-transportes.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:346700863655:android:b61178d1e65772bb7ea382",
+        "android_client_info": {
+          "package_name": "com.example.controle_containers"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
