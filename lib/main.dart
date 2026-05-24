@@ -316,7 +316,7 @@ class _LoginPageState extends State<LoginPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 380),
+                  constraints: const BoxConstraints(maxWidth: 334),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: const Color(0xBBFFFFFF),
@@ -324,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
                       border: Border.all(color: const Color(0xFFE1E5E8)),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(12),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -337,14 +337,6 @@ class _LoginPageState extends State<LoginPage> {
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _redefinindoSenha
-                                  ? 'Informe usuario e nova senha'
-                                  : 'Controle de entradas, saidas e patio',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 20),
                             TextFormField(
