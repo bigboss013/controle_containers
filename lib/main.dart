@@ -324,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
                       border: Border.all(color: const Color(0xFFE1E5E8)),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -338,7 +338,7 @@ class _LoginPageState extends State<LoginPage> {
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 15),
                             TextFormField(
                               controller: _nomeController,
                               decoration: const InputDecoration(
@@ -354,7 +354,7 @@ class _LoginPageState extends State<LoginPage> {
                                 );
                               },
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 9),
                             TextFormField(
                               controller: _senhaController,
                               obscureText: _ocultarSenha,
@@ -398,7 +398,7 @@ class _LoginPageState extends State<LoginPage> {
                               },
                             ),
                             if (_redefinindoSenha) ...[
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 9),
                               TextFormField(
                                 controller: _confirmarSenhaController,
                                 obscureText: _ocultarSenha,
@@ -422,7 +422,7 @@ class _LoginPageState extends State<LoginPage> {
                                 },
                               ),
                             ],
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 14),
                             FilledButton.icon(
                               onPressed:
                                   _redefinindoSenha ? _redefinirSenha : _entrar,
@@ -437,7 +437,7 @@ class _LoginPageState extends State<LoginPage> {
                                     : 'Entrar',
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             TextButton(
                               onPressed: _alternarModo,
                               child: Text(
