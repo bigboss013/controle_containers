@@ -7,9 +7,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1109,32 +1109,86 @@ class _HomePageState extends State<HomePage> {
   void _mostrarDialogAtualizacao(BuildContext context, String urlDownload) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Atualizacao disponivel'),
-        content: const Text('Nova versao disponivel para download.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Agora nao'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              final uri = Uri.parse(urlDownload);
-              try {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              } catch (_) {
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Abra o link no navegador:')), 
-                  );
-                }
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            icon: const Icon(Icons.download),
-            label: const Text('Baixar'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          bool baixando = false;
+          return AlertDialog(
+            title: const Text('Atualizacao disponivel'),
+            content: Text(baixando
+                ? 'Baixando atualizacao...'
+                : 'Nova versao disponivel para download.'),
+            actions: [
+              TextButton(
+                onPressed: baixando ? null : () => Navigator.pop(ctx),
+                child: const Text('Agora nao'),
+              ),
+              FilledButton.icon(
+                onPressed: baixando
+                    ? null
+                    : () async {
+                        setDialogState(() => baixando = true);
+                        try {
+                          final dir = await getTemporaryDirectory();
+                          final file = File(
+                              '${dir.path}/app-release.apk');
+                          final client = HttpClient();
+                          final request =
+                              await client.getUrl(Uri.parse(urlDownload));
+                          final response = await request.close();
+                          if (response.statusCode != 200) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Erro ao baixar atualizacao.')),
+                              );
+                            }
+                            return;
+                          }
+                          final sink = file.openWrite();
+                          await response.pipe(sink);
+                          await sink.flush();
+                          await sink.close();
+                          client.close();
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            final fileUri = Uri.file(file.path);
+                            if (await canLaunchUrl(fileUri)) {
+                              await launchUrl(fileUri);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'APK baixado em: ${file.path}'),
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            setDialogState(() => baixando = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('Erro: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                icon: baixando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download),
+                label: Text(baixando ? 'Baixando...' : 'Baixar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -3274,39 +3328,6 @@ class _EntradaPageState extends State<EntradaPage> {
     setState(() => _fotoAvariaPath = foto.path);
   }
 
-  Future<void> _ocrCodigo() async {
-    final foto = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (foto == null) return;
-
-    final inputImage = InputImage.fromFilePath(foto.path);
-    final textRecognizer = TextRecognizer();
-    try {
-      final result = await textRecognizer.processImage(inputImage);
-      final texto = result.text.toUpperCase();
-      final regex = RegExp(r'[A-Z]{3,4}\d{6,7}');
-      final match = regex.firstMatch(texto);
-      if (match != null) {
-        _codigoController.text = match.group(0)!;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Codigo detectado: ${match.group(0)}')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nenhum codigo de container encontrado na foto.')),
-          );
-        }
-      }
-    } finally {
-      textRecognizer.close();
-    }
-  }
-
   void _salvar() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -3386,17 +3407,12 @@ class _EntradaPageState extends State<EntradaPage> {
               TextFormField(
                 controller: _codigoController,
                 style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Codigo do conteiner',
                   hintText: 'Ex: MSCU1234567',
-                  prefixIcon: const Icon(Icons.tag),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    tooltip: 'Ler codigo com OCR',
-                    onPressed: _ocrCodigo,
-                  ),
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  prefixIcon: Icon(Icons.tag),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) => obrigatorio(value, 'Informe o codigo.'),
