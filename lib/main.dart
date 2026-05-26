@@ -9,7 +9,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_filex/open_filex.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1107,103 +1107,32 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _mostrarDialogAtualizacao(BuildContext context, String urlDownload) {
-    String status = '';
-    bool concluido = false;
-    String? erro;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: const Text('Atualizacao'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (erro != null) ...[
-                  const Icon(Icons.error, color: Colors.red, size: 48),
-                  const SizedBox(height: 8),
-                  SelectableText(erro!, textAlign: TextAlign.center),
-                ] else if (concluido) ...[
-                  const Icon(Icons.check_circle, color: Colors.green, size: 48),
-                  const SizedBox(height: 8),
-                  Text(status, textAlign: TextAlign.center),
-                ] else if (status.isEmpty) ...[
-                  const Text('Nova versao disponivel.'),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      setDialogState(() => status = 'Baixando...');
-                      try {
-                        final dir = await getTemporaryDirectory();
-                        final file = File('${dir.path}/app-release.apk');
-                        if (file.existsSync()) await file.delete();
-                        final client = HttpClient();
-                        final request =
-                            await client.getUrl(Uri.parse(urlDownload));
-                        final response = await request.close();
-                        if (response.statusCode != 200) {
-                          erro =
-                              'Erro HTTP ${response.statusCode}';
-                          setDialogState(() {});
-                          return;
-                        }
-                        setDialogState(() => status = 'Salvando...');
-                        final sink = file.openWrite();
-                        await response.pipe(sink);
-                        await sink.flush();
-                        await sink.close();
-                        client.close();
-                        setDialogState(
-                            () => status = 'Abrindo instalador...');
-                        if (ctx.mounted) await Future.delayed(const Duration(milliseconds: 500));
-                        final result = await OpenFilex.open(file.path);
-                        if (result.type == ResultType.done) {
-                          concluido = true;
-                          status = 'Instalador aberto. Se nao aparecer, '
-                              'abra manualmente:\n$urlDownload';
-                        } else {
-                          erro = 'Erro ao abrir instalador: ${result.message}';
-                        }
-                      } catch (e) {
-                        erro = 'Erro: $e';
-                        status = 'Baixe manualmente em:\n$urlDownload';
-                      }
-                      setDialogState(() {});
-                    },
-                    icon: const Icon(Icons.download),
-                    label: const Text('Baixar'),
-                  ),
-                ] else ...[
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(status, textAlign: TextAlign.center),
-                ],
-              ],
-            ),
-            actions: [
-              if (erro != null || concluido)
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Fechar'),
-                ),
-              if (erro != null)
-                TextButton(
-                  onPressed: () {
-                    erro = null;
-                    status = '';
-                    concluido = false;
-                    setDialogState(() {});
-                  },
-                  child: const Text('Tentar novamente'),
-                ),
-            ],
-          );
-        },
+      builder: (ctx) => AlertDialog(
+        title: const Text('Atualizacao'),
+        content: const Text(
+          'Nova versao disponivel. O navegador vai abrir para baixar.\n'
+          'Apos o download, toque na notificacao para instalar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Agora nao'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final uri = Uri.parse(urlDownload);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.download),
+            label: const Text('Baixar'),
+          ),
+        ],
       ),
     );
   }
