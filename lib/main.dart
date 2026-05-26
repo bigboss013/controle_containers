@@ -3025,15 +3025,18 @@ class DownloadDialog extends StatefulWidget {
 
 class _DownloadDialogState extends State<DownloadDialog> {
   bool _iniciado = false;
+  bool _erro = false;
 
   Future<void> _baixar() async {
     try {
       await launchUrl(
         Uri.parse(widget.urlDownload),
-        mode: LaunchMode.externalApplication,
+        mode: LaunchMode.platformDefault,
       );
       if (mounted) setState(() => _iniciado = true);
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => _erro = true);
+    }
   }
 
   Future<void> _instalar() async {
@@ -3054,7 +3057,14 @@ class _DownloadDialogState extends State<DownloadDialog> {
         children: [
           const Icon(Icons.system_update, color: Color(0xFF1565C0), size: 48),
           const SizedBox(height: 12),
-          if (!_iniciado) ...[
+          if (_erro)
+            const Text(
+              'Nao foi possivel abrir o navegador.\n'
+              'Acesse manualmente o link abaixo:\n',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          if (!_iniciado && !_erro) ...[
             const Text('Nova versao disponivel para download.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
@@ -3067,7 +3077,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
-          ] else ...[
+          ] else if (_iniciado) ...[
             const Text('Download iniciado no navegador!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -3078,6 +3088,13 @@ class _DownloadDialogState extends State<DownloadDialog> {
               'va em Downloads e toque no APK baixado.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+          if (_erro) ...[
+            SelectableText(
+              widget.urlDownload,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: Colors.blue),
             ),
           ],
         ],
@@ -3093,7 +3110,13 @@ class _DownloadDialogState extends State<DownloadDialog> {
             icon: const Icon(Icons.download_done),
             label: const Text('Instalar'),
           ),
-        if (!_iniciado)
+        if (_erro)
+          FilledButton.icon(
+            onPressed: _baixar,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tentar novamente'),
+          ),
+        if (!_iniciado && !_erro)
           FilledButton.icon(
             onPressed: _baixar,
             icon: const Icon(Icons.open_in_browser),
