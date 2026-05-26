@@ -2744,28 +2744,31 @@ class ContainerCard extends StatelessWidget {
           if (noShowActions) return;
           _abrirDetalhesDialog(context);
         },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.codigo,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _statusDotParaContainer(item),
+                    if (_statusDotParaContainer(item) is! SizedBox)
+                      const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.codigo,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  Chip(
-                    label: Text(
-                      noShowActions
-                          ? 'No-show #${item.noShowCount}'
-                          : item.tipo,
+                    Chip(
+                      label: Text(
+                        noShowActions
+                            ? 'No-show #${item.noShowCount}'
+                            : item.tipo,
+                      ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -2833,6 +2836,16 @@ class ContainerCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _statusDotParaContainer(ContainerItem c) {
+    if (c.status == ContainerStatus.embarcado) {
+      return _BlinkingDot(color: Colors.amber);
+    }
+    if (c.status == ContainerStatus.noShow || c.noShowCount > 0) {
+      return _StaticDot(color: Colors.red);
+    }
+    return const SizedBox(width: 14, height: 14);
   }
 
   void _abrirMoverDialog(BuildContext context) {
@@ -4047,6 +4060,9 @@ class HistoricoPage extends StatelessWidget {
   }
 
   Widget _buildStatusCircle(MovementItem movimento, ContainerItem? container) {
+    if (movimento.tipo == 'Cancelamento Embarque') {
+      return const Icon(Icons.close, color: Colors.red, size: 16);
+    }
     if (container != null && container.status == ContainerStatus.embarcado) {
       return _BlinkingDot(color: Colors.amber);
     }
