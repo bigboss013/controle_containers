@@ -224,17 +224,23 @@ class _AppShellState extends State<AppShell> {
   final List<AppUser> _usuarios = [];
   bool _carregandoUsuarios = true;
   String? _ultimoUsuarioNome;
+  String? _usuarioSalvoNome;
+  String? _usuarioSalvoSenha;
+  bool _usarBiometria = false;
 
   @override
   void initState() {
     super.initState();
     _carregarUsuarios();
-    _carregarUltimoUsuario();
+    _carregarDadosLogin();
   }
 
-  Future<void> _carregarUltimoUsuario() async {
+  Future<void> _carregarDadosLogin() async {
     final prefs = await SharedPreferences.getInstance();
     _ultimoUsuarioNome = prefs.getString('ultimo_usuario');
+    _usuarioSalvoNome = prefs.getString('usuario_salvo_nome');
+    _usuarioSalvoSenha = prefs.getString('usuario_salvo_senha');
+    _usarBiometria = prefs.getBool('usar_biometria') ?? false;
   }
 
   Future<void> _salvarUltimoUsuario(String nome) async {
@@ -312,6 +318,9 @@ class _AppShellState extends State<AppShell> {
       return LoginPage(
         usuarios: _usuarios,
         ultimoUsuarioNome: _ultimoUsuarioNome,
+        usuarioSalvoNome: _usuarioSalvoNome,
+        usuarioSalvoSenha: _usuarioSalvoSenha,
+        usarBiometria: _usarBiometria,
         onEntrar: (novoUsuario) {
           _salvarUltimoUsuario(novoUsuario.nome);
           setState(() => _usuario = novoUsuario);
@@ -335,12 +344,18 @@ class LoginPage extends StatefulWidget {
     super.key,
     required this.usuarios,
     this.ultimoUsuarioNome,
+    this.usuarioSalvoNome,
+    this.usuarioSalvoSenha,
+    this.usarBiometria = false,
     required this.onEntrar,
     required this.onRedefinirSenha,
   });
 
   final List<AppUser> usuarios;
   final String? ultimoUsuarioNome;
+  final String? usuarioSalvoNome;
+  final String? usuarioSalvoSenha;
+  final bool usarBiometria;
   final ValueChanged<AppUser> onEntrar;
   final Future<void> Function(String nome, String novaSenha) onRedefinirSenha;
 
@@ -356,33 +371,33 @@ class _LoginPageState extends State<LoginPage> {
   final _localAuth = LocalAuthentication();
   bool _redefinindoSenha = false;
   bool _ocultarSenha = true;
-  bool _biometricaDisponivel = false;
+  bool _salvarUsuario = false;
 
   @override
   void initState() {
     super.initState();
-    _verificarBiometria();
-  }
-
-  Future<void> _verificarBiometria() async {
-    final disponivel = await _localAuth.canCheckBiometrics;
-    if (mounted) setState(() => _biometricaDisponivel = disponivel);
+    if (widget.usuarioSalvoNome != null) {
+      _nomeController.text = widget.usuarioSalvoNome!;
+      if (widget.usuarioSalvoSenha != null) {
+        _senhaController.text = widget.usuarioSalvoSenha!;
+      }
+      _salvarUsuario = true;
+    }
+    if (widget.usarBiometria && widget.usuarioSalvoNome != null) {
+      _entrarBiometrico();
+    }
   }
 
   Future<void> _entrarBiometrico() async {
     final autenticado = await _localAuth.authenticate(
-      localizedReason: 'Use sua biometria para entrar',
+      localizedReason: 'Use a senha de desbloqueio ou biometria do aparelho',
     );
     if (!autenticado) return;
-
-    final nome = widget.ultimoUsuarioNome;
-    if (nome == null) return;
-
-    final usuario = widget.usuarios.cast<AppUser?>().firstWhere(
-      (u) => u!.nome.toLowerCase() == nome.toLowerCase(),
-      orElse: () => null,
+    final usuario = _buscarUsuario(
+      widget.usuarioSalvoNome!,
+      widget.usuarioSalvoSenha ?? '',
     );
-    if (usuario != null) widget.onEntrar(usuario);
+    if (usuario != null && mounted) widget.onEntrar(usuario);
   }
 
   void _entrar() {
@@ -402,7 +417,46 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    widget.onEntrar(usuario);
+    _salvarCredenciais();
+    _perguntarBiometria(() => widget.onEntrar(usuario));
+  }
+
+  Future<void> _salvarCredenciais() async {
+    if (!_salvarUsuario) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('usuario_salvo_nome', _nomeController.text.trim());
+    await prefs.setString('usuario_salvo_senha', _senhaController.text);
+  }
+
+  void _perguntarBiometria(VoidCallback onConfirmar) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Entrada rapida'),
+        content: const Text(
+          'Deseja usar a senha de desbloqueio ou biometria do aparelho '
+          'para entrar automaticamente na proxima vez?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirmar();
+            },
+            child: const Text('Nao'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('usar_biometria', true);
+              if (ctx.mounted) Navigator.pop(ctx);
+              onConfirmar();
+            },
+            child: const Text('Sim'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _redefinirSenha() async {
@@ -552,6 +606,32 @@ class _LoginPageState extends State<LoginPage> {
                                 }
                               },
                             ),
+                            if (!_redefinindoSenha) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: Checkbox(
+                                      value: _salvarUsuario,
+                                      onChanged: (v) => setState(
+                                          () => _salvarUsuario = v ?? false),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => setState(
+                                        () => _salvarUsuario =
+                                            !_salvarUsuario),
+                                    child: const Text('Salvar usuario',
+                                        style: TextStyle(fontSize: 13)),
+                                  ),
+                                ],
+                              ),
+                            ],
                             if (_redefinindoSenha) ...[
                               const SizedBox(height: 8),
                               TextFormField(
@@ -601,19 +681,6 @@ class _LoginPageState extends State<LoginPage> {
                                     : 'Redefinir senha',
                               ),
                             ),
-                            if (!_redefinindoSenha &&
-                                _biometricaDisponivel &&
-                                widget.ultimoUsuarioNome != null) ...[
-                              const SizedBox(height: 5),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _entrarBiometrico,
-                                  icon: const Icon(Icons.fingerprint),
-                                  label: const Text('Entrar com biometria'),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -1730,7 +1797,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            const Spacer(),
+            IconButton(
+              onPressed: () => _abrirMapaPatio(context),
+              icon: const Icon(Icons.map, size: 22),
+              tooltip: 'Visualizar patio 3D',
+              visualDensity: VisualDensity.compact,
+            ),
             TextButton.icon(
               onPressed: () => setState(() => _selectedSection = null),
               icon: const Icon(Icons.arrow_back, size: 18),
@@ -2068,6 +2140,48 @@ class _DashboardPageState extends State<DashboardPage> {
                         c.posicao.split('-')[0] == block)
                     .toList(),
                 highlightCodigo: container.codigo,
+                onContainerTap: (c) {
+                  Navigator.pop(ctx);
+                  _abrirDetalhesContainer(context, c);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _abrirMapaPatio(BuildContext context) {
+    final yard = widget.containers
+        .where((c) =>
+            c.status != ContainerStatus.saiu && c.posicao.isNotEmpty)
+        .toList();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Mapa 3D - Patio',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: YardMap3D(
+                containers: yard,
                 onContainerTap: (c) {
                   Navigator.pop(ctx);
                   _abrirDetalhesContainer(context, c);
