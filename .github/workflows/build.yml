@@ -23,7 +23,7 @@ jobs:
           flutter-version: '3.x'
 
       - run: flutter pub get
-      - run: flutter build apk --release
+      - run: flutter build apk --release --build-number=${{ github.run_number }}
 
       - name: Get version
         id: version

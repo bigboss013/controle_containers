@@ -424,10 +424,15 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _salvarCredenciais() async {
-    if (!_salvarUsuario) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('usuario_salvo_nome', _nomeController.text.trim());
-    await prefs.setString('usuario_salvo_senha', _senhaController.text);
+    if (_salvarUsuario) {
+      await prefs.setString('usuario_salvo_nome', _nomeController.text.trim());
+      await prefs.setString('usuario_salvo_senha', _senhaController.text);
+    } else {
+      await prefs.remove('usuario_salvo_nome');
+      await prefs.remove('usuario_salvo_senha');
+      await prefs.remove('usar_biometria');
+    }
   }
 
   void _perguntarBiometria(VoidCallback onConfirmar) {
@@ -617,17 +622,28 @@ class _LoginPageState extends State<LoginPage> {
                                     width: 24,
                                     child: Checkbox(
                                       value: _salvarUsuario,
-                                      onChanged: (v) => setState(
-                                          () => _salvarUsuario = v ?? false),
+                                      onChanged: (v) => setState(() {
+                                        _salvarUsuario = v ?? false;
+                                        if (!_salvarUsuario) {
+                                          _nomeController.clear();
+                                          _senhaController.clear();
+                                          _salvarCredenciais();
+                                        }
+                                      }),
                                       materialTapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
                                   GestureDetector(
-                                    onTap: () => setState(
-                                        () => _salvarUsuario =
-                                            !_salvarUsuario),
+                                    onTap: () => setState(() {
+                                      _salvarUsuario = !_salvarUsuario;
+                                      if (!_salvarUsuario) {
+                                        _nomeController.clear();
+                                        _senhaController.clear();
+                                        _salvarCredenciais();
+                                      }
+                                    }),
                                     child: const Text('Salvar usuario',
                                         style: TextStyle(fontSize: 13)),
                                   ),
@@ -2934,6 +2950,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
   String _status = '';
   String? _erro;
   bool _concluido = false;
+  double _progresso = 0;
 
   Future<void> _baixarEInstalar() async {
     setState(() => _status = 'Baixando...');
@@ -2948,9 +2965,16 @@ class _DownloadDialogState extends State<DownloadDialog> {
         setState(() => _erro = 'Erro HTTP ${response.statusCode}');
         return;
       }
-      setState(() => _status = 'Salvando...');
+      final total = response.contentLength ?? 0;
       final sink = file.openWrite();
-      await response.pipe(sink);
+      int received = 0;
+      await for (final chunk in response) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total > 0) {
+          setState(() => _progresso = received / total);
+        }
+      }
       await sink.flush();
       await sink.close();
       client.close();
@@ -2960,7 +2984,8 @@ class _DownloadDialogState extends State<DownloadDialog> {
       if (result.type == ResultType.done) {
         setState(() {
           _concluido = true;
-          _status = 'Instalacao iniciada!';
+          _status = 'Instalacao iniciada! '
+              'Apos instalar no sistema, abra o app novamente.';
         });
       } else {
         setState(() => _erro = 'Erro: ${result.message}');
@@ -2973,7 +2998,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Atualizacao'),
+      title: const Text('Atualizacao disponivel'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2981,10 +3006,26 @@ class _DownloadDialogState extends State<DownloadDialog> {
             const Icon(Icons.error, color: Colors.red, size: 44),
             const SizedBox(height: 8),
             SelectableText(_erro!, textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            const Text('Baixe manualmente pelo navegador:',
+                style: TextStyle(fontSize: 12)),
+            const SelectableText(
+              'github.com/bigboss013/controle_containers/releases',
+              style: TextStyle(fontSize: 12, color: Colors.blue),
+            ),
           ] else if (_concluido) ...[
             const Icon(Icons.check_circle, color: Colors.green, size: 44),
             const SizedBox(height: 8),
-            Text(_status),
+            const Text(
+              'Download concluido!',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Clique em "Instalar" na janela do sistema.\n'
+              'Depois abra o app novamente.',
+              textAlign: TextAlign.center,
+            ),
           ] else if (_status.isEmpty) ...[
             const Text('Nova versao disponivel. Deseja baixar e instalar?'),
           ] else ...[
@@ -2995,38 +3036,52 @@ class _DownloadDialogState extends State<DownloadDialog> {
             ),
             const SizedBox(height: 12),
             Text(_status, textAlign: TextAlign.center),
+            if (_progresso > 0) ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: _progresso),
+              Text('${(_progresso * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(fontSize: 12)),
+            ],
           ],
         ],
       ),
       actions: [
-        if (_status.isEmpty)
+        if (_status.isEmpty) ...[
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Agora nao'),
           ),
-        if (_status.isEmpty)
           FilledButton.icon(
             onPressed: _baixarEInstalar,
             icon: const Icon(Icons.download),
             label: const Text('Baixar e Instalar'),
           ),
-        if (_erro != null || _concluido)
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-        if (_erro != null)
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _erro = null;
-                _status = '';
-                _concluido = false;
-              });
-              _baixarEInstalar();
-            },
-            child: const Text('Tentar novamente'),
-          ),
+        ],
+        if (_erro != null || _concluido) ...[
+          if (_concluido)
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
+            ),
+          if (_erro != null)
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
+            ),
+          if (_erro != null)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _erro = null;
+                  _status = '';
+                  _progresso = 0;
+                  _concluido = false;
+                });
+                _baixarEInstalar();
+              },
+              child: const Text('Tentar novamente'),
+            ),
+        ],
       ],
     );
   }
