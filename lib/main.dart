@@ -1098,6 +1098,7 @@ class _HomePageState extends State<HomePage> {
   final List<MovementItem> _movimentos = [];
   final List<Cliente> _clientes = [];
   int _abaAtual = 0;
+  int _dashboardResetKey = 0;
   bool _deadlineBlink = true;
 
   Color get _deadlineAlertColor {
@@ -1389,6 +1390,28 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
   }
 
+  void _cancelarEmbarque(ContainerItem item) {
+    final usuarioNome = widget.usuario.nome;
+    setState(() {
+      item.terminal = null;
+      item.navio = null;
+      item.agendamento = null;
+      item.status = ContainerStatus.armazenado;
+      _movimentos.insert(
+        0,
+        MovementItem(
+          tipo: 'Cancelamento Embarque',
+          codigo: item.codigo,
+          descricao:
+              '${item.cliente} - Embarque cancelado em ${positionLabel(item.posicao)}',
+          data: DateTime.now(),
+          usuario: usuarioNome,
+        ),
+      );
+    });
+    _salvarDados();
+  }
+
   void _reintegrarNoShow(ContainerItem item) {
     final usuarioNome = widget.usuario.nome;
     setState(() {
@@ -1413,6 +1436,7 @@ class _HomePageState extends State<HomePage> {
     final isAdmin = widget.usuario.perfil == UserRole.administrador;
     final paginas = [
       DashboardPage(
+        key: ValueKey(_dashboardResetKey),
         containers: _containers,
         armazenados: _armazenados,
         patio: _patio,
@@ -1427,6 +1451,7 @@ class _HomePageState extends State<HomePage> {
         onNoShow: _registrarNoShow,
         onReintegrar: _reintegrarNoShow,
         onReserva: _registrarReserva,
+        onCancelarEmbarque: _cancelarEmbarque,
         onAtualizar: () {
           setState(() {});
           _salvarDados();
@@ -1515,7 +1540,10 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(child: paginas[_abaAtual]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _abaAtual,
-        onDestinationSelected: (index) => setState(() => _abaAtual = index),
+        onDestinationSelected: (index) => setState(() {
+          if (index == 0 && _abaAtual == 0) _dashboardResetKey++;
+          _abaAtual = index;
+        }),
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -1573,6 +1601,7 @@ class DashboardPage extends StatefulWidget {
     required this.onNoShow,
     required this.onReintegrar,
     required this.onReserva,
+    required this.onCancelarEmbarque,
     required this.onAtualizar,
   });
 
@@ -1589,6 +1618,7 @@ class DashboardPage extends StatefulWidget {
   final ValueChanged<ContainerItem> onNoShow;
   final ValueChanged<ContainerItem> onReintegrar;
   final ValueChanged<ContainerItem> onReserva;
+  final ValueChanged<ContainerItem> onCancelarEmbarque;
   final VoidCallback onAtualizar;
 
   @override
@@ -1707,6 +1737,34 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         const SizedBox(height: 16),
         if (_selectedSection == null) ...[
+          InkWell(
+            onTap: () => _abrirMapaPatio(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE1E5E8)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.map, color: Color(0xFF1565C0), size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Mapa do Patio',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
@@ -1838,6 +1896,7 @@ class _DashboardPageState extends State<DashboardPage> {
               onMover: (novaPosicao) => widget.onMover(item, novaPosicao),
               onEmbarque: () => _confirmarEmbarque(context, item),
               onReserva: () => widget.onReserva(item),
+              onCancelarEmbarque: () => widget.onCancelarEmbarque(item),
               onAbrirMapa: () => _abrirDialogMapa(context, item),
             ),
           ),
@@ -1926,7 +1985,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           labelText: 'Tipo', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                        style: const TextStyle(fontSize: 14),
+                        style: const TextStyle(fontSize: 14, color: Colors.black87),
                         items: const [
                           DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
                           DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
@@ -2619,6 +2678,7 @@ class ContainerCard extends StatelessWidget {
     this.onReintegrar,
     this.onRegistrarNoShow,
     this.onAbrirMapa,
+    this.onCancelarEmbarque,
   });
 
   final ContainerItem item;
@@ -2633,6 +2693,7 @@ class ContainerCard extends StatelessWidget {
   final VoidCallback? onReintegrar;
   final VoidCallback? onRegistrarNoShow;
   final VoidCallback? onAbrirMapa;
+  final VoidCallback? onCancelarEmbarque;
 
   @override
   Widget build(BuildContext context) {
@@ -2896,6 +2957,24 @@ class ContainerCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (item.status == ContainerStatus.embarcado &&
+                      onCancelarEmbarque != null) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          onCancelarEmbarque!.call();
+                        },
+                        icon: const Icon(Icons.cancel_outlined, size: 18),
+                        label: const Text('Cancelar Embarque',
+                            style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),
@@ -2937,15 +3016,28 @@ class ContainerCard extends StatelessWidget {
   }
 }
 
-class DownloadDialog extends StatelessWidget {
+class DownloadDialog extends StatefulWidget {
   const DownloadDialog({super.key, required this.urlDownload});
   final String urlDownload;
+  @override
+  State<DownloadDialog> createState() => _DownloadDialogState();
+}
 
-  Future<void> _baixarPeloNavegador(BuildContext context) async {
-    final uri = Uri.parse(urlDownload);
+class _DownloadDialogState extends State<DownloadDialog> {
+  bool _iniciado = false;
+
+  Future<void> _baixar() async {
+    final uri = Uri.parse(widget.urlDownload);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (context.mounted) Navigator.pop(context);
+      if (mounted) setState(() => _iniciado = true);
+    }
+  }
+
+  Future<void> _instalar() async {
+    final uri = Uri.parse(widget.urlDownload);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -2953,35 +3045,52 @@ class DownloadDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Atualizacao disponivel'),
-      content: const Column(
+      content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.system_update, color: Color(0xFF1565C0), size: 48),
-          SizedBox(height: 12),
-          Text(
-            'Nova versao disponivel para download.',
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'O download sera feito pelo navegador.\n'
-            'Apos baixar, toque na notificacao para instalar.\n'
-            'Se o Play Protect perguntar, toque em "Instalar mesmo assim".',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey),
-          ),
+          const Icon(Icons.system_update, color: Color(0xFF1565C0), size: 48),
+          const SizedBox(height: 12),
+          if (!_iniciado) ...[
+            const Text('Nova versao disponivel para download.',
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            const Text(
+              'O download sera feito pelo navegador.\n'
+              'Apos baixar, toque em "Instalar".\n'
+              'Se o Play Protect perguntar, toque em "Instalar mesmo assim".',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ] else ...[
+            const Text('Download iniciado no navegador!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Apos o download, toque em "Instalar"\npara abrir o instalador do sistema.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Agora nao'),
+          child: const Text('Fechar'),
         ),
-        FilledButton.icon(
-          onPressed: () => _baixarPeloNavegador(context),
-          icon: const Icon(Icons.open_in_browser),
-          label: const Text('Baixar e Instalar'),
-        ),
+        if (_iniciado)
+          FilledButton.icon(
+            onPressed: _instalar,
+            icon: const Icon(Icons.download_done),
+            label: const Text('Instalar'),
+          ),
+        if (!_iniciado)
+          FilledButton.icon(
+            onPressed: _baixar,
+            icon: const Icon(Icons.open_in_browser),
+            label: const Text('Baixar e Instalar'),
+          ),
       ],
     );
   }
@@ -3620,7 +3729,7 @@ class _EntradaPageState extends State<EntradaPage> {
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 value: _tipo,
-                style: const TextStyle(fontSize: 18),
+                style: const TextStyle(fontSize: 18, color: Colors.black87),
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
                   prefixIcon: Icon(Icons.view_in_ar_outlined),
@@ -4123,7 +4232,7 @@ class DeadlinePage extends StatelessWidget {
                           labelText: 'Tipo', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                        style: const TextStyle(fontSize: 14),
+                        style: const TextStyle(fontSize: 14, color: Colors.black87),
                         items: const [
                           DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
                           DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
