@@ -227,8 +227,6 @@ class _AppShellState extends State<AppShell> {
   String? _ultimoUsuarioNome;
   String? _usuarioSalvoNome;
   String? _usuarioSalvoSenha;
-  bool _usarBiometria = false;
-
   @override
   void initState() {
     super.initState();
@@ -241,7 +239,6 @@ class _AppShellState extends State<AppShell> {
     _ultimoUsuarioNome = prefs.getString('ultimo_usuario');
     _usuarioSalvoNome = prefs.getString('usuario_salvo_nome');
     _usuarioSalvoSenha = prefs.getString('usuario_salvo_senha');
-    _usarBiometria = prefs.getBool('usar_biometria') ?? false;
   }
 
   Future<void> _salvarUltimoUsuario(String nome) async {
@@ -321,7 +318,6 @@ class _AppShellState extends State<AppShell> {
         ultimoUsuarioNome: _ultimoUsuarioNome,
         usuarioSalvoNome: _usuarioSalvoNome,
         usuarioSalvoSenha: _usuarioSalvoSenha,
-        usarBiometria: _usarBiometria,
         onEntrar: (novoUsuario) {
           _salvarUltimoUsuario(novoUsuario.nome);
           setState(() => _usuario = novoUsuario);
@@ -347,7 +343,6 @@ class LoginPage extends StatefulWidget {
     this.ultimoUsuarioNome,
     this.usuarioSalvoNome,
     this.usuarioSalvoSenha,
-    this.usarBiometria = false,
     required this.onEntrar,
     required this.onRedefinirSenha,
   });
@@ -356,7 +351,6 @@ class LoginPage extends StatefulWidget {
   final String? ultimoUsuarioNome;
   final String? usuarioSalvoNome;
   final String? usuarioSalvoSenha;
-  final bool usarBiometria;
   final ValueChanged<AppUser> onEntrar;
   final Future<void> Function(String nome, String novaSenha) onRedefinirSenha;
 
@@ -383,8 +377,6 @@ class _LoginPageState extends State<LoginPage> {
         _senhaController.text = widget.usuarioSalvoSenha!;
       }
       _salvarUsuario = true;
-    }
-    if (widget.usarBiometria && widget.usuarioSalvoNome != null) {
       _entrarBiometrico();
     }
   }
@@ -398,7 +390,11 @@ class _LoginPageState extends State<LoginPage> {
       widget.usuarioSalvoNome!,
       widget.usuarioSalvoSenha ?? '',
     );
-    if (usuario != null && mounted) widget.onEntrar(usuario);
+    if (usuario != null && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('usar_biometria');
+      widget.onEntrar(usuario);
+    }
   }
 
   void _entrar() {
@@ -419,7 +415,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     _salvarCredenciais();
-    _perguntarBiometria(() => widget.onEntrar(usuario));
+    widget.onEntrar(usuario);
   }
 
   Future<void> _salvarCredenciais() async {
@@ -430,39 +426,7 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       await prefs.remove('usuario_salvo_nome');
       await prefs.remove('usuario_salvo_senha');
-      await prefs.remove('usar_biometria');
     }
-  }
-
-  void _perguntarBiometria(VoidCallback onConfirmar) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Entrada rapida'),
-        content: const Text(
-          'Deseja usar a senha de desbloqueio ou biometria do aparelho '
-          'para entrar automaticamente na proxima vez?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onConfirmar();
-            },
-            child: const Text('Nao'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('usar_biometria', true);
-              if (ctx.mounted) Navigator.pop(ctx);
-              onConfirmar();
-            },
-            child: const Text('Sim'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _redefinirSenha() async {
@@ -1413,6 +1377,51 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
   }
 
+  void _abrirDialogEditarPosicao(BuildContext context, ContainerItem item) {
+    final posController = TextEditingController(text: item.posicao);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Editar posicao - ${item.codigo}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InfoLine(icon: Icons.business_outlined, texto: item.cliente),
+            const SizedBox(height: 12),
+            TextField(
+              controller: posController,
+              decoration: const InputDecoration(
+                labelText: 'Nova posicao no patio',
+                hintText: 'Ex: A-14 ou A5-34',
+                prefixIcon: Icon(Icons.place_outlined),
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final novaPos = posController.text.trim().toUpperCase();
+              if (novaPos.isEmpty) return;
+              item.posicao = novaPos;
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Posicao alterada para $novaPos.')),
+              );
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _reintegrarNoShow(ContainerItem item) {
     final usuarioNome = widget.usuario.nome;
     setState(() {
@@ -1452,7 +1461,10 @@ class _HomePageState extends State<HomePage> {
         onNoShow: _registrarNoShow,
         onReintegrar: _reintegrarNoShow,
         onReserva: _registrarReserva,
-        onCancelarEmbarque: _cancelarEmbarque,
+        onCancelarEmbarque: (c) {
+          _cancelarEmbarque(c);
+          _abrirDialogEditarPosicao(context, c);
+        },
         onAtualizar: () {
           setState(() {});
           _salvarDados();
@@ -3981,7 +3993,15 @@ class HistoricoPage extends StatelessWidget {
                 leading: CircleAvatar(
                   child: Icon(iconForMovement(movimento.tipo), size: 20),
                 ),
-                title: Text('${movimento.tipo} - ${movimento.codigo}'),
+                title: Row(
+                  children: [
+                    _buildStatusCircle(movimento, container),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('${movimento.tipo} - ${movimento.codigo}'),
+                    ),
+                  ],
+                ),
                 subtitle: Text(
                   '${movimento.descricao}\n${formatDate(movimento.data)}${movimento.usuario.isNotEmpty ? ' • ${movimento.usuario}' : ''}',
                 ),
@@ -3995,6 +4015,19 @@ class HistoricoPage extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  Widget _buildStatusCircle(MovementItem movimento, ContainerItem? container) {
+    if (container != null && container.status == ContainerStatus.embarcado) {
+      return _BlinkingDot(color: Colors.amber);
+    }
+    if (movimento.tipo == 'Embarque') {
+      return _StaticDot(color: Colors.green);
+    }
+    if (movimento.tipo == 'No-show' || (container?.noShowCount ?? 0) > 0) {
+      return _StaticDot(color: Colors.red);
+    }
+    return const SizedBox(width: 14, height: 14);
   }
 
   void _abrirAcoesContainer(BuildContext context, ContainerItem? container, MovementItem movimento, bool isSaida) {
@@ -4611,4 +4644,70 @@ String formatDate(DateTime value) {
   final hora = value.hour.toString().padLeft(2, '0');
   final minuto = value.minute.toString().padLeft(2, '0');
   return '$dia/$mes/${value.year} $hora:$minuto';
+}
+
+class _StaticDot extends StatelessWidget {
+  const _StaticDot({required this.color});
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _BlinkingDot extends StatefulWidget {
+  const _BlinkingDot({required this.color});
+  final Color color;
+  @override
+  State<_BlinkingDot> createState() => _BlinkingDotState();
+}
+
+class _BlinkingDotState extends State<_BlinkingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) => Opacity(
+        opacity: _animation.value,
+        child: Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: widget.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
 }
