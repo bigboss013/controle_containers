@@ -579,36 +579,52 @@ class _LoginPageState extends State<LoginPage> {
                             if (!_redefinindoSenha) ...[
                               const SizedBox(height: 4),
                               Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: Checkbox(
-                                      value: _salvarUsuario,
-                                      onChanged: (v) => setState(() {
-                                        _salvarUsuario = v ?? false;
-                                        if (!_salvarUsuario) {
-                                          _nomeController.clear();
-                                          _senhaController.clear();
-                                          _salvarCredenciais();
-                                        }
-                                      }),
-                                      materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: _salvarUsuario,
+                                          onChanged: (v) => setState(() {
+                                            _salvarUsuario = v ?? false;
+                                            if (!_salvarUsuario) {
+                                              _nomeController.clear();
+                                              _senhaController.clear();
+                                              _salvarCredenciais();
+                                            }
+                                          }),
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      GestureDetector(
+                                        onTap: () => setState(() {
+                                          _salvarUsuario = !_salvarUsuario;
+                                          if (!_salvarUsuario) {
+                                            _nomeController.clear();
+                                            _senhaController.clear();
+                                            _salvarCredenciais();
+                                          }
+                                        }),
+                                        child: const Text('Salvar usuario',
+                                            style: TextStyle(fontSize: 13)),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: () => setState(() {
-                                      _salvarUsuario = !_salvarUsuario;
-                                      if (!_salvarUsuario) {
-                                        _nomeController.clear();
-                                        _senhaController.clear();
-                                        _salvarCredenciais();
-                                      }
-                                    }),
-                                    child: const Text('Salvar usuario',
-                                        style: TextStyle(fontSize: 13)),
+                                  TextButton(
+                                    onPressed: _alternarModo,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text('Redefinir senha',
+                                        style: TextStyle(fontSize: 12)),
                                   ),
                                 ],
                               ),
@@ -654,14 +670,11 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 5),
-                            TextButton(
-                              onPressed: _alternarModo,
-                              child: Text(
-                                _redefinindoSenha
-                                    ? 'Voltar para login'
-                                    : 'Redefinir senha',
+                            if (_redefinindoSenha)
+                              TextButton(
+                                onPressed: _alternarModo,
+                                child: const Text('Voltar para login'),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -1407,7 +1420,7 @@ class _HomePageState extends State<HomePage> {
           ),
           FilledButton(
             onPressed: () {
-              final novaPos = posController.text.trim().toUpperCase();
+              final novaPos = posController.text.trim().toUpperCase().replaceAll('.', '-');
               if (novaPos.isEmpty) return;
               item.posicao = novaPos;
               Navigator.pop(ctx);
@@ -2122,7 +2135,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       onPressed: () {
                         container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
                         container.cliente = cliCtrl.text.trim();
-                        container.posicao = posCtrl.text.trim().toUpperCase();
+                        container.posicao = posCtrl.text.trim().toUpperCase().replaceAll('.', '-');
                         container.tipo = tipo;
                         container.terminal = terminalCtrl.text.trim().isEmpty
                             ? null : terminalCtrl.text.trim();
@@ -2173,8 +2186,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
-    final block = container.posicao.split('-').isNotEmpty
-        ? container.posicao.split('-')[0]
+    final pos = container.posicao.replaceAll('.', '-');
+    final block = pos.split('-').isNotEmpty
+        ? pos.split('-')[0]
         : '';
     showDialog<void>(
       context: context,
@@ -2204,8 +2218,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     .where((c) =>
                         c.posicao.isNotEmpty &&
                         c.status != ContainerStatus.saiu &&
-                        c.posicao.split('-').isNotEmpty &&
-                        c.posicao.split('-')[0] == block)
+                        c.posicao.replaceAll('.', '-').split('-').isNotEmpty &&
+                        c.posicao.replaceAll('.', '-').split('-')[0] == block)
                     .toList(),
                 highlightCodigo: container.codigo,
                 onContainerTap: (c) {
@@ -2843,7 +2857,7 @@ class ContainerCard extends StatelessWidget {
             ),
             FilledButton(
               onPressed: () {
-                final novaPosicao = controller.text.trim().toUpperCase();
+                final novaPosicao = controller.text.trim().toUpperCase().replaceAll('.', '-');
                 if (novaPosicao.isNotEmpty) {
                   onMover(novaPosicao);
                 }
@@ -3052,7 +3066,21 @@ class _DownloadDialogState extends State<DownloadDialog> {
   bool _iniciado = false;
   bool _erro = false;
 
+  Future<void> _deletarApkAntigo() async {
+    try {
+      final dir = Directory('/storage/emulated/0/Download');
+      if (await dir.exists()) {
+        final files = dir.listSync().where(
+          (f) => f is File && f.path.endsWith('app-release.apk'));
+        for (final f in files) {
+          await (f as File).delete();
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _baixar() async {
+    await _deletarApkAntigo();
     try {
       await launchUrl(
         Uri.parse(widget.urlDownload),
@@ -3181,7 +3209,8 @@ class YardMap3D extends StatelessWidget {
     final layout = <String, Map<int?, Map<int, Map<int, ContainerItem>>>>{};
     for (final c in yard) {
       final (block, row) = parsePosition(c.posicao);
-      final parts = c.posicao.split('-');
+      final pos = c.posicao.replaceAll('.', '-');
+      final parts = pos.split('-');
       final sh = parts.length >= 2 ? parts[1] : '';
       final stack = sh.isNotEmpty ? int.tryParse(sh[0]) ?? 1 : 1;
       final height = sh.length >= 2 ? int.tryParse(sh[1]) ?? 1 : 1;
@@ -3666,7 +3695,7 @@ class _EntradaPageState extends State<EntradaPage> {
         cliente: _clienteController.text.trim(),
         tipo: _tipo,
         posicao: _podeInformarPosicao
-            ? _posicaoController.text.trim().toUpperCase()
+            ? _posicaoController.text.trim().toUpperCase().replaceAll('.', '-')
             : '',
         pesoKg: _cheio ? parseWeight(_pesoController.text) : null,
         observacao: _observacaoController.text.trim(),
@@ -4108,9 +4137,9 @@ class HistoricoPage extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              final novaPos = posController.text.trim().toUpperCase();
-              if (novaPos.isEmpty) return;
-              container.posicao = novaPos;
+                      final novaPos = posController.text.trim().toUpperCase().replaceAll('.', '-');
+                      if (novaPos.isEmpty) return;
+                      container.posicao = novaPos;
               onReintegrar!(container);
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4469,7 +4498,7 @@ class DeadlinePage extends StatelessWidget {
                       onPressed: () {
                         c.codigoCliente = codCliCtrl.text.trim().toUpperCase();
                         c.cliente = cliCtrl.text.trim();
-                        c.posicao = posCtrl.text.trim().toUpperCase();
+                        c.posicao = posCtrl.text.trim().toUpperCase().replaceAll('.', '-');
                         c.tipo = tipo;
                         c.terminal = terminalCtrl.text.trim().isEmpty
                             ? null : terminalCtrl.text.trim();
@@ -4494,8 +4523,9 @@ class DeadlinePage extends StatelessWidget {
   }
 
   void _abrirMapa(BuildContext context, ContainerItem c) {
-    final block = c.posicao.split('-').isNotEmpty
-        ? c.posicao.split('-')[0]
+    final pos = c.posicao.replaceAll('.', '-');
+    final block = pos.split('-').isNotEmpty
+        ? pos.split('-')[0]
         : '';
     final screenH = MediaQuery.of(context).size.height;
     showDialog(
@@ -4528,8 +4558,8 @@ class DeadlinePage extends StatelessWidget {
                     .where((x) =>
                         x.posicao.isNotEmpty &&
                         x.status != ContainerStatus.saiu &&
-                        x.posicao.split('-').isNotEmpty &&
-                        x.posicao.split('-')[0] == block)
+                        x.posicao.replaceAll('.', '-').split('-').isNotEmpty &&
+                        x.posicao.replaceAll('.', '-').split('-')[0] == block)
                     .toList(),
                 highlightCodigo: c.codigo,
               ),
@@ -4620,8 +4650,9 @@ ContainerStatus containerStatusFromName(String? name) {
 /// or A5-34 (block A, row 5, stack 3, height 4)
 /// Returns (block, row) where row is null if not specified.
 (String block, int? row) parsePosition(String pos) {
-  final parts = pos.split('-');
-  if (parts.length < 2) return (pos, null);
+  final normalized = pos.replaceAll('.', '-');
+  final parts = normalized.split('-');
+  if (parts.length < 2) return (normalized, null);
   final blockMatch = RegExp(r'^([A-Z]+)(\d+)?$').firstMatch(parts[0]);
   final block = blockMatch?.group(1) ?? parts[0];
   final row = int.tryParse(blockMatch?.group(2) ?? '');

@@ -8,3 +8,5 @@ build/
 android/local.properties
 *.hprof
 
+
+.continue/
