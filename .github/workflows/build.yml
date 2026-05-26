@@ -23,7 +23,10 @@ jobs:
           flutter-version: '3.x'
 
       - run: flutter pub get
-      - run: flutter build apk --release --build-number=${{ github.run_number }}
+      - name: Build APK
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+        env:
+          _JAVA_OPTIONS: -Xmx8G
 
       - name: Get version
         id: version

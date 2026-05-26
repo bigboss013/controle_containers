@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_auth/local_auth.dart';
@@ -3402,6 +3403,7 @@ class _EntradaPageState extends State<EntradaPage> {
   final _imagePicker = ImagePicker();
   String? _fotoAvariaPath;
   bool _cheio = true;
+  bool _isScanning = false;
   String _tipo = '20 DRY';
   DateTime? _deadline;
 
@@ -3558,6 +3560,45 @@ class _EntradaPageState extends State<EntradaPage> {
     setState(() => _fotoAvariaPath = foto.path);
   }
 
+  Future<void> _scanContainerCode() async {
+    final foto = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,
+    );
+    if (foto == null) return;
+    setState(() => _isScanning = true);
+    try {
+      final inputImage = InputImage.fromFilePath(foto.path);
+      final recognizer = TextRecognizer();
+      final recognisedText = await recognizer.processImage(inputImage);
+      await recognizer.close();
+      final codigoRegex = RegExp(r'[A-Z]{4}\d{7}');
+      for (final block in recognisedText.blocks) {
+        for (final line in block.lines) {
+          final match = codigoRegex.firstMatch(line.text.replaceAll(' ', ''));
+          if (match != null) {
+            _codigoController.text = match.group(0)!;
+            if (mounted) setState(() => _isScanning = false);
+            return;
+          }
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Codigo do container nao encontrado na imagem.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao ler imagem: $e')),
+        );
+      }
+    }
+    if (mounted) setState(() => _isScanning = false);
+  }
+
   void _salvar() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -3637,12 +3678,25 @@ class _EntradaPageState extends State<EntradaPage> {
               TextFormField(
                 controller: _codigoController,
                 style: const TextStyle(fontSize: 18),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Codigo do conteiner',
                   hintText: 'Ex: MSCU1234567',
-                  prefixIcon: Icon(Icons.tag),
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  prefixIcon: const Icon(Icons.tag),
+                  suffixIcon: _isScanning
+                      ? const Padding(
+                          padding: EdgeInsets.all(14),
+                          child: SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.camera_alt_outlined),
+                          tooltip: 'Escanear codigo',
+                          onPressed: _scanContainerCode,
+                        ),
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) => obrigatorio(value, 'Informe o codigo.'),
