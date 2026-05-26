@@ -137,6 +137,17 @@ class FirestoreDb {
   static Future<void> removerCliente(String codigo) async {
     await _db.collection('clientes').doc(codigo).delete();
   }
+
+  static Future<void> limparTudo() async {
+    final containers = await _db.collection('containers').get();
+    for (final doc in containers.docs) {
+      await doc.reference.delete();
+    }
+    final movimentos = await _db.collection('movimentos').get();
+    for (final doc in movimentos.docs) {
+      await doc.reference.delete();
+    }
+  }
 }
 
 void main() async {
@@ -696,11 +707,13 @@ class UsuariosPage extends StatefulWidget {
     required this.usuarios,
     required this.onCadastrar,
     required this.onExcluir,
+    required this.onLimparDados,
   });
 
   final List<AppUser> usuarios;
   final Future<void> Function(AppUser usuario) onCadastrar;
   final Future<void> Function(String nome) onExcluir;
+  final VoidCallback onLimparDados;
 
   @override
   State<UsuariosPage> createState() => _UsuariosPageState();
@@ -921,6 +934,36 @@ class _UsuariosPageState extends State<UsuariosPage> {
             subtitle: Text(roleLabel(usuario.perfil)),
             onTap: () => _confirmarExclusao(usuario),
           ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Limpar dados'),
+                content: const Text(
+                    'Deseja excluir TODOS os containers e movimentos? Esta acao nao pode ser desfeita.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancelar'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Limpar tudo'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true && context.mounted) {
+              widget.onLimparDados();
+            }
+          },
+          icon: const Icon(Icons.delete_sweep, size: 18),
+          label: const Text('Limpar dados'),
         ),
       ],
     );
@@ -1248,6 +1291,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _limparDados() async {
+    await FirestoreDb.limparTudo();
+    setState(() {
+      _containers.clear();
+      _movimentos.clear();
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dados excluidos com sucesso.')),
+    );
+  }
+
   void _registrarEntrada(ContainerItem item) {
     final usuarioNome = widget.usuario.nome;
     setState(() {
@@ -1498,6 +1553,7 @@ class _HomePageState extends State<HomePage> {
           setState(() {});
           _salvarDados();
         },
+        perfil: widget.usuario.perfil,
       ),
       HistoricoPage(
         movimentos: _movimentos,
@@ -1510,6 +1566,7 @@ class _HomePageState extends State<HomePage> {
           usuarios: widget.usuarios,
           onCadastrar: widget.onCadastrarUsuario,
           onExcluir: widget.onExcluirUsuario,
+          onLimparDados: _limparDados,
         ),
     ];
 
@@ -1934,6 +1991,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _abrirDetalhesContainer(BuildContext context, ContainerItem container) {
+    if (widget.perfil == UserRole.gate) return;
     final codCliCtrl = TextEditingController(text: container.codigoCliente);
     final cliCtrl = TextEditingController(text: container.cliente);
     final posCtrl = TextEditingController(text: container.posicao);
@@ -2775,11 +2833,30 @@ class ContainerCard extends StatelessWidget {
                     if (_statusDotParaContainer(item) is! SizedBox)
                       const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        item.codigo,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.codigo,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (item.posicao.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Tooltip(
+                                message: 'Aguardando posicao',
+                                child: Icon(
+                                  Icons.push_pin_outlined,
+                                  size: 18,
+                                  color: Colors.red.shade400,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Chip(
@@ -2803,7 +2880,9 @@ class ContainerCard extends StatelessWidget {
               ),
               InfoLine(
                 icon: Icons.place_outlined,
-                texto: 'Posicao ${positionLabel(item.posicao)}',
+                texto: item.posicao.isEmpty
+                    ? 'Aguardando posicao'
+                    : 'Posicao ${positionLabel(item.posicao)}',
               ),
               if (item.observacao.trim().isNotEmpty)
                 InfoLine(
@@ -2864,6 +2943,9 @@ class ContainerCard extends StatelessWidget {
     }
     if (c.status == ContainerStatus.noShow || c.noShowCount > 0) {
       return _StaticDot(color: Colors.red);
+    }
+    if (c.posicao.isEmpty) {
+      return _StaticDot(color: Colors.purple);
     }
     return const SizedBox(width: 14, height: 14);
   }
@@ -2946,7 +3028,9 @@ class ContainerCard extends StatelessWidget {
                   texto: 'Peso ${weightLabel(item.pesoKg)}'),
               InfoLine(
                   icon: Icons.place_outlined,
-                  texto: 'Posicao ${positionLabel(item.posicao)}'),
+                  texto: item.posicao.isEmpty
+                      ? 'Aguardando posicao'
+                      : 'Posicao ${positionLabel(item.posicao)}'),
               if (item.observacao.trim().isNotEmpty)
                 InfoLine(
                     icon: Icons.report_problem_outlined,
@@ -3975,23 +4059,25 @@ class _EntradaPageState extends State<EntradaPage> {
                       'Perfil Gate registra a entrada sem posicao. A posicao sera definida pelo Conferente.',
                 ),
               ],
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              if (_podeInformarPosicao) ...[
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  onPressed: _selecionarDeadline,
+                  icon: Icon(
+                    _deadline != null ? Icons.event_busy : Icons.event_outlined,
+                    color: _deadline != null ? Colors.red : null,
+                  ),
+                  label: Text(
+                    _deadline != null
+                        ? 'Deadline: ${formatDate(_deadline!)}'
+                        : 'Definir Deadline (prazo de entrega)',
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
-                onPressed: _selecionarDeadline,
-                icon: Icon(
-                  _deadline != null ? Icons.event_busy : Icons.event_outlined,
-                  color: _deadline != null ? Colors.red : null,
-                ),
-                label: Text(
-                  _deadline != null
-                      ? 'Deadline: ${formatDate(_deadline!)}'
-                      : 'Definir Deadline (prazo de entrega)',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -4266,11 +4352,19 @@ class PermissionNotice extends StatelessWidget {
 }
 
 class DeadlinePage extends StatelessWidget {
-  const DeadlinePage(
-      {super.key, required this.containers, required this.onAtualizar});
+  const DeadlinePage({
+    super.key,
+    required this.containers,
+    required this.onAtualizar,
+    required this.perfil,
+  });
 
   final List<ContainerItem> containers;
   final VoidCallback onAtualizar;
+  final UserRole perfil;
+
+  bool get _podeEditar =>
+      perfil == UserRole.conferente || perfil == UserRole.administrador;
 
   @override
   Widget build(BuildContext context) {
@@ -4349,6 +4443,37 @@ class DeadlinePage extends StatelessWidget {
   }
 
   void _mostrarContainer(BuildContext context, ContainerItem c) {
+    if (!_podeEditar) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Expanded(child: Text(c.codigo, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+              const SizedBox(width: 4),
+              Chip(label: Text(c.tipo, style: const TextStyle(fontSize: 12))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InfoLine(icon: Icons.business_outlined, texto: c.cliente),
+              InfoLine(icon: Icons.badge_outlined, texto: 'Codigo cliente ${emptyLabel(c.codigoCliente)}'),
+              InfoLine(icon: Icons.place_outlined, texto: c.posicao.isEmpty ? 'Aguardando posicao' : 'Posicao ${positionLabel(c.posicao)}'),
+              InfoLine(icon: Icons.scale_outlined, texto: 'Peso ${weightLabel(c.pesoKg)}'),
+              if (c.terminal != null) InfoLine(icon: Icons.business, texto: 'Terminal: ${c.terminal}'),
+              if (c.navio != null) InfoLine(icon: Icons.directions_boat, texto: 'Navio: ${c.navio}'),
+              if (c.deadline != null) InfoLine(icon: Icons.event_busy, texto: 'Deadline: ${formatDate(c.deadline!)}'),
+              if (c.observacao.isNotEmpty) InfoLine(icon: Icons.report_problem_outlined, texto: c.observacao),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar'))],
+        ),
+      );
+      return;
+    }
+
     final codCliCtrl = TextEditingController(text: c.codigoCliente);
     final cliCtrl = TextEditingController(text: c.cliente);
     final posCtrl = TextEditingController(text: c.posicao);
