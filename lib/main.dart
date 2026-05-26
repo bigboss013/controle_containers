@@ -1141,7 +1141,7 @@ class _HomePageState extends State<HomePage> {
       final tag = data['tag_name'] as String?;
       if (tag == null) return;
 
-      final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '');
+      final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '').split('+')[0];
       if (_versaoMaior(versaoRemota, versaoAtual)) {
         String? urlDownload;
         final assets = data['assets'] as List<dynamic>?;
