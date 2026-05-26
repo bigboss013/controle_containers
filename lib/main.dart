@@ -9,6 +9,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1176,30 +1178,7 @@ class _HomePageState extends State<HomePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Atualizacao'),
-        content: const Text(
-          'Nova versao disponivel. O navegador vai abrir para baixar.\n'
-          'Apos o download, toque na notificacao para instalar.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Agora nao'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final uri = Uri.parse(urlDownload);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            icon: const Icon(Icons.download),
-            label: const Text('Baixar'),
-          ),
-        ],
-      ),
+      builder: (ctx) => DownloadDialog(urlDownload: urlDownload),
     );
   }
 
@@ -2940,6 +2919,115 @@ class ContainerCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class DownloadDialog extends StatefulWidget {
+  const DownloadDialog({super.key, required this.urlDownload});
+  final String urlDownload;
+  @override
+  State<DownloadDialog> createState() => _DownloadDialogState();
+}
+
+class _DownloadDialogState extends State<DownloadDialog> {
+  String _status = '';
+  String? _erro;
+  bool _concluido = false;
+
+  Future<void> _baixarEInstalar() async {
+    setState(() => _status = 'Baixando...');
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/app-release.apk');
+      if (file.existsSync()) await file.delete();
+      final client = HttpClient();
+      final request = await client.getUrl(Uri.parse(widget.urlDownload));
+      final response = await request.close();
+      if (response.statusCode != 200) {
+        setState(() => _erro = 'Erro HTTP ${response.statusCode}');
+        return;
+      }
+      setState(() => _status = 'Salvando...');
+      final sink = file.openWrite();
+      await response.pipe(sink);
+      await sink.flush();
+      await sink.close();
+      client.close();
+      setState(() => _status = 'Instalando...');
+      await Future.delayed(const Duration(milliseconds: 300));
+      final result = await OpenFilex.open(file.path);
+      if (result.type == ResultType.done) {
+        setState(() {
+          _concluido = true;
+          _status = 'Instalacao iniciada!';
+        });
+      } else {
+        setState(() => _erro = 'Erro: ${result.message}');
+      }
+    } catch (e) {
+      setState(() => _erro = 'Erro: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Atualizacao'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_erro != null) ...[
+            const Icon(Icons.error, color: Colors.red, size: 44),
+            const SizedBox(height: 8),
+            SelectableText(_erro!, textAlign: TextAlign.center),
+          ] else if (_concluido) ...[
+            const Icon(Icons.check_circle, color: Colors.green, size: 44),
+            const SizedBox(height: 8),
+            Text(_status),
+          ] else if (_status.isEmpty) ...[
+            const Text('Nova versao disponivel. Deseja baixar e instalar?'),
+          ] else ...[
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(height: 12),
+            Text(_status, textAlign: TextAlign.center),
+          ],
+        ],
+      ),
+      actions: [
+        if (_status.isEmpty)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Agora nao'),
+          ),
+        if (_status.isEmpty)
+          FilledButton.icon(
+            onPressed: _baixarEInstalar,
+            icon: const Icon(Icons.download),
+            label: const Text('Baixar e Instalar'),
+          ),
+        if (_erro != null || _concluido)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        if (_erro != null)
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _erro = null;
+                _status = '';
+                _concluido = false;
+              });
+              _baixarEInstalar();
+            },
+            child: const Text('Tentar novamente'),
+          ),
+      ],
     );
   }
 }
