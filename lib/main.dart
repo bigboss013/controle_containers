@@ -2102,6 +2102,26 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: const TextStyle(fontSize: 14),
                         minLines: 2, maxLines: 3,
                       ),
+                      const SizedBox(height: 12),
+                      const Text('Historico de movimentacoes',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      ...widget.movimentos
+                          .where((m) => m.codigo == container.codigo)
+                          .take(10)
+                          .map((m) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                Icon(iconForMovement(m.tipo), size: 16, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text('${m.tipo} - ${formatDate(m.data)}',
+                                      style: const TextStyle(fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          )),
                     ],
                   ),
                 ),
@@ -4022,7 +4042,12 @@ class HistoricoPage extends StatelessWidget {
         if (movimentos.isEmpty)
           const EmptyState(texto: 'Nenhum movimento registrado.')
         else
-          ...movimentos.map(
+          ...movimentos
+              .where((m) {
+                final c = containers.where((x) => x.codigo == m.codigo).firstOrNull;
+                return c == null || c.status != ContainerStatus.armazenado;
+              })
+              .map(
             (movimento) {
               final container = containers.where((c) => c.codigo == movimento.codigo).firstOrNull;
               final isSaida = movimento.tipo == 'Saida';
