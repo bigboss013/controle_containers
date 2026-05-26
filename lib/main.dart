@@ -3027,18 +3027,22 @@ class _DownloadDialogState extends State<DownloadDialog> {
   bool _iniciado = false;
 
   Future<void> _baixar() async {
-    final uri = Uri.parse(widget.urlDownload);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      await launchUrl(
+        Uri.parse(widget.urlDownload),
+        mode: LaunchMode.externalApplication,
+      );
       if (mounted) setState(() => _iniciado = true);
-    }
+    } catch (_) {}
   }
 
   Future<void> _instalar() async {
-    final uri = Uri.parse(widget.urlDownload);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    try {
+      await launchUrl(
+        Uri.parse(widget.urlDownload),
+        mode: LaunchMode.platformDefault,
+      );
+    } catch (_) {}
   }
 
   @override
@@ -3057,7 +3061,9 @@ class _DownloadDialogState extends State<DownloadDialog> {
             const Text(
               'O download sera feito pelo navegador.\n'
               'Apos baixar, toque em "Instalar".\n'
-              'Se o Play Protect perguntar, toque em "Instalar mesmo assim".',
+              'Se o Play Protect perguntar, toque em "Instalar mesmo assim".\n'
+              'Se o Play Protect bloquear, abra o gerenciador de arquivos,\n'
+              'va em Downloads e instale manualmente o APK.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
@@ -3067,7 +3073,9 @@ class _DownloadDialogState extends State<DownloadDialog> {
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             const Text(
-              'Apos o download, toque em "Instalar"\npara abrir o instalador do sistema.',
+              'Apos o download, toque em "Instalar".\n'
+              'Se o Play Protect bloquear, abra o app Arquivos,\n'
+              'va em Downloads e toque no APK baixado.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
