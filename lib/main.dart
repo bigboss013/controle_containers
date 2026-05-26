@@ -1632,6 +1632,7 @@ class _DashboardPageState extends State<DashboardPage> {
   String _searchQuery = '';
   String _patioSearchQuery = '';
   String? _selectedSection;
+  final Set<String> _embarqueFiltros = {};
 
   @override
   void dispose() {
@@ -1896,7 +1897,10 @@ class _DashboardPageState extends State<DashboardPage> {
               onMover: (novaPosicao) => widget.onMover(item, novaPosicao),
               onEmbarque: () => _confirmarEmbarque(context, item),
               onReserva: () => widget.onReserva(item),
-              onCancelarEmbarque: () => widget.onCancelarEmbarque(item),
+              onCancelarEmbarque: null,
+              onEditar: item.status == ContainerStatus.embarcado
+                  ? () => _abrirDetalhesContainer(context, item)
+                  : null,
               onAbrirMapa: () => _abrirDialogMapa(context, item),
             ),
           ),
@@ -2247,7 +2251,35 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildEmbarqueSection() {
-    final terminais = _termaisAgrupados;
+    final items = _embarqueItems;
+    var filtered = items.toList();
+    if (_embarqueFiltros.isNotEmpty) {
+      filtered = items.where((c) {
+        for (final f in _embarqueFiltros) {
+          switch (f) {
+            case 'Data':
+              if (c.agendamento == null) return false;
+            case 'Hora':
+              if (c.agendamento == null) return false;
+            case 'Terminal':
+              if (c.terminal == null || c.terminal!.isEmpty) return false;
+            case 'Navio':
+              if (c.navio == null || c.navio!.isEmpty) return false;
+          }
+        }
+        return true;
+      }).toList();
+    }
+    filtered.sort((a, b) => (a.agendamento ?? DateTime(9999))
+        .compareTo(b.agendamento ?? DateTime(9999)));
+    final grupos = <String, List<ContainerItem>>{};
+    for (final c in filtered) {
+      final chave = c.agendamento != null
+          ? '${c.agendamento!.year}-${c.agendamento!.month.toString().padLeft(2, '0')}-${c.agendamento!.day.toString().padLeft(2, '0')}'
+          : 'Sem data';
+      grupos.putIfAbsent(chave, () => []);
+      grupos[chave]!.add(c);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2255,29 +2287,41 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             Expanded(
               child: Text(
-                'Embarques por terminal',
+                'Embarques',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            TextButton.icon(
-              onPressed: () => setState(() => _selectedSection = null),
-              icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Inicio'),
+            PopupMenuButton<String>(
+              tooltip: 'Filtros',
+              icon: const Icon(Icons.filter_list),
+              onSelected: (value) {
+                setState(() {
+                  if (_embarqueFiltros.contains(value)) {
+                    _embarqueFiltros.remove(value);
+                  } else {
+                    _embarqueFiltros.add(value);
+                  }
+                });
+              },
+              itemBuilder: (_) => [
+                for (final op in ['Data', 'Hora', 'Terminal', 'Navio'])
+                  CheckedPopupMenuItem<String>(
+                    value: op,
+                    checked: _embarqueFiltros.contains(op),
+                    child: Text(op),
+                  ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 8),
-        if (terminais.isEmpty)
+        if (filtered.isEmpty)
           const EmptyState(texto: 'Nenhum embarque agendado.')
         else
-          ...terminais.entries.map((entry) {
-            final containers = entry.value;
-            containers.sort((a, b) =>
-                (a.agendamento ?? DateTime.now())
-                    .compareTo(b.agendamento ?? DateTime.now()));
+          ...grupos.entries.map((entry) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Card(
@@ -2291,69 +2335,25 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.business,
-                              color: Color(0xFF0F766E)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(entry.key,
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800)),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0FDF4),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${containers.length} container${containers.length > 1 ? 'es' : ''}',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF16A34A),
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
+                      Text(entry.key,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F766E))),
                       const SizedBox(height: 8),
-                      ...containers.map((c) => Padding(
+                      ...entry.value.map((c) => Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: InkWell(
-                              onTap: () =>
-                                  _abrirDetalhesContainer(context, c),
-                              borderRadius: BorderRadius.circular(4),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 2, horizontal: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                        child: Text(c.codigo,
-                                            style: const TextStyle(
-                                                fontWeight:
-                                                    FontWeight.w600))),
-                                    Text(
-                                      'Navio: ${c.navio ?? ''}',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      c.agendamento != null
-                                          ? formatDate(c.agendamento!)
-                                          : '',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            child: ContainerCard(
+                              item: c,
+                              podeMover: false,
+                              podeEmbarcar: false,
+                              podeReservar: false,
+                              noShowActions: false,
+                              mostrarCancelarEmbarque: true,
+                              onSaida: () => widget.onSaida(c),
+                              onMover: (_) {},
+                              onEmbarque: null,
+                              onCancelarEmbarque: () => widget.onCancelarEmbarque(c),
+                              onAbrirMapa: () => _abrirDialogMapa(context, c),
                             ),
                           )),
                     ],
@@ -2679,6 +2679,8 @@ class ContainerCard extends StatelessWidget {
     this.onRegistrarNoShow,
     this.onAbrirMapa,
     this.onCancelarEmbarque,
+    this.mostrarCancelarEmbarque = false,
+    this.onEditar,
   });
 
   final ContainerItem item;
@@ -2694,6 +2696,8 @@ class ContainerCard extends StatelessWidget {
   final VoidCallback? onRegistrarNoShow;
   final VoidCallback? onAbrirMapa;
   final VoidCallback? onCancelarEmbarque;
+  final bool mostrarCancelarEmbarque;
+  final VoidCallback? onEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -2957,22 +2961,31 @@ class ContainerCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (item.status == ContainerStatus.embarcado &&
-                      onCancelarEmbarque != null) ...[
+                  if (item.status == ContainerStatus.embarcado) ...[
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          onCancelarEmbarque!.call();
-                        },
-                        icon: const Icon(Icons.cancel_outlined, size: 18),
-                        label: const Text('Cancelar Embarque',
-                            style: TextStyle(fontSize: 13)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                      ),
+                      child: mostrarCancelarEmbarque
+                          ? OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                onCancelarEmbarque?.call();
+                              },
+                              icon: const Icon(Icons.cancel_outlined, size: 18),
+                              label: const Text('Cancelar Embarque',
+                                  style: TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                onEditar?.call();
+                              },
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              label: const Text('Editar',
+                                  style: TextStyle(fontSize: 13)),
+                            ),
                     ),
                   ],
                 ],
