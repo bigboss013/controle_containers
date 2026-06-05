@@ -10,6 +10,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:file_picker/file_picker.dart';
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -143,6 +145,13 @@ class FirestoreDb {
     for (final doc in containers.docs) {
       await doc.reference.delete();
     }
+    final movimentos = await _db.collection('movimentos').get();
+    for (final doc in movimentos.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  static Future<void> limparHistorico() async {
     final movimentos = await _db.collection('movimentos').get();
     for (final doc in movimentos.docs) {
       await doc.reference.delete();
@@ -1509,6 +1518,41 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
   }
 
+  void _excluirContainer(ContainerItem item) async {
+    await FirestoreDb.removerContainer(item.codigo);
+    setState(() {
+      _containers.removeWhere((c) => c.codigo == item.codigo);
+      _movimentos.removeWhere((m) => m.codigo == item.codigo);
+    });
+    _salvarDados();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Container ${item.codigo} excluido.')),
+    );
+  }
+
+  void _excluirMovimento(MovementItem movimento) async {
+    setState(() {
+      _movimentos.remove(movimento);
+    });
+    _salvarDados();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Movimento excluido.')),
+    );
+  }
+
+  void _limparHistorico() async {
+    await FirestoreDb.limparHistorico();
+    setState(() {
+      _movimentos.clear();
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Historico limpo com sucesso.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = widget.usuario.perfil == UserRole.administrador;
@@ -1520,8 +1564,8 @@ class _HomePageState extends State<HomePage> {
         patio: _patio,
         total: _containers.length,
         movimentos: _movimentos,
-        podeMover: widget.usuario.perfil == UserRole.conferente ||
-            widget.usuario.perfil == UserRole.administrador,
+        podeMover: isAdmin,
+        podeEditar: isAdmin,
         perfil: widget.usuario.perfil,
         onSaida: _registrarSaida,
         onMover: _alterarPosicao,
@@ -1537,6 +1581,7 @@ class _HomePageState extends State<HomePage> {
           setState(() {});
           _salvarDados();
         },
+        onExcluir: _excluirContainer,
       ),
       EntradaPage(
         perfil: widget.usuario.perfil,
@@ -1545,6 +1590,11 @@ class _HomePageState extends State<HomePage> {
         onCadastrarCliente: (Cliente c) {
           setState(() => _clientes.add(c));
           _salvarClientes();
+        },
+        onImportarExcel: (List<ContainerItem> items) async {
+          for (final item in items) {
+            _registrarEntrada(item);
+          }
         },
       ),
       DeadlinePage(
@@ -1555,12 +1605,15 @@ class _HomePageState extends State<HomePage> {
         },
         perfil: widget.usuario.perfil,
       ),
-      HistoricoPage(
-        movimentos: _movimentos,
-        containers: _containers,
-        onRegistrarNoShow: _registrarNoShow,
-        onReintegrar: _reintegrarNoShow,
-      ),
+      if (isAdmin)
+        HistoricoPage(
+          movimentos: _movimentos,
+          containers: _containers,
+          onRegistrarNoShow: _registrarNoShow,
+          onReintegrar: _reintegrarNoShow,
+          onExcluirMovimento: _excluirMovimento,
+          onLimparHistorico: _limparHistorico,
+        ),
       if (isAdmin)
         UsuariosPage(
           usuarios: widget.usuarios,
@@ -1650,11 +1703,12 @@ class _HomePageState extends State<HomePage> {
             ),
             label: 'Deadline',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Historico',
-          ),
+          if (isAdmin)
+            const NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long),
+              label: 'Historico',
+            ),
           if (isAdmin)
             const NavigationDestination(
               icon: Icon(Icons.manage_accounts_outlined),
@@ -1677,6 +1731,7 @@ class DashboardPage extends StatefulWidget {
     required this.total,
     required this.movimentos,
     required this.podeMover,
+    required this.podeEditar,
     required this.perfil,
     required this.onSaida,
     required this.onMover,
@@ -1686,6 +1741,7 @@ class DashboardPage extends StatefulWidget {
     required this.onReserva,
     required this.onCancelarEmbarque,
     required this.onAtualizar,
+    required this.onExcluir,
   });
 
   final List<ContainerItem> containers;
@@ -1694,6 +1750,7 @@ class DashboardPage extends StatefulWidget {
   final int total;
   final List<MovementItem> movimentos;
   final bool podeMover;
+  final bool podeEditar;
   final UserRole perfil;
   final ValueChanged<ContainerItem> onSaida;
   final void Function(ContainerItem item, String novaPosicao) onMover;
@@ -1703,6 +1760,7 @@ class DashboardPage extends StatefulWidget {
   final ValueChanged<ContainerItem> onReserva;
   final ValueChanged<ContainerItem> onCancelarEmbarque;
   final VoidCallback onAtualizar;
+  final ValueChanged<ContainerItem> onExcluir;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -1980,9 +2038,10 @@ class _DashboardPageState extends State<DashboardPage> {
               onEmbarque: () => _confirmarEmbarque(context, item),
               onReserva: () => widget.onReserva(item),
               onCancelarEmbarque: null,
-              onEditar: item.status == ContainerStatus.embarcado
+              onEditar: item.status == ContainerStatus.embarcado && widget.podeEditar
                   ? () => _abrirDetalhesContainer(context, item)
                   : null,
+              onExcluir: widget.podeEditar ? () => widget.onExcluir(item) : null,
               onAbrirMapa: () => _abrirDialogMapa(context, item),
             ),
           ),
@@ -2785,6 +2844,7 @@ class ContainerCard extends StatelessWidget {
     this.onCancelarEmbarque,
     this.mostrarCancelarEmbarque = false,
     this.onEditar,
+    this.onExcluir,
   });
 
   final ContainerItem item;
@@ -2802,6 +2862,7 @@ class ContainerCard extends StatelessWidget {
   final VoidCallback? onCancelarEmbarque;
   final bool mostrarCancelarEmbarque;
   final VoidCallback? onEditar;
+  final VoidCallback? onExcluir;
 
   @override
   Widget build(BuildContext context) {
@@ -2986,6 +3047,28 @@ class ContainerCard extends StatelessWidget {
     );
   }
 
+  void _confirmarExclusao(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir container'),
+        content: Text('Deseja excluir o container ${item.codigo}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) onExcluir?.call();
+  }
+
   void _abrirDetalhesDialog(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -3076,6 +3159,19 @@ class ContainerCard extends StatelessWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
+                  if (onExcluir != null)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _confirmarExclusao(context);
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Excluir', style: TextStyle(fontSize: 13, color: Colors.red)),
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      ),
+                    ),
+                  if (onExcluir != null) const SizedBox(width: 8),
                   if (podeMover)
                     Expanded(
                       child: OutlinedButton.icon(
@@ -3582,12 +3678,14 @@ class EntradaPage extends StatefulWidget {
     required this.clientes,
     required this.onSalvar,
     required this.onCadastrarCliente,
+    this.onImportarExcel,
   });
 
   final UserRole perfil;
   final List<Cliente> clientes;
   final ValueChanged<ContainerItem> onSalvar;
   final ValueChanged<Cliente> onCadastrarCliente;
+  final Future<void> Function(List<ContainerItem> items)? onImportarExcel;
 
   @override
   State<EntradaPage> createState() => _EntradaPageState();
@@ -3859,6 +3957,107 @@ class _EntradaPageState extends State<EntradaPage> {
     }
   }
 
+  Future<void> _importarExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nao foi possivel ler o arquivo.')),
+        );
+        return;
+      }
+      final excel = Excel.decodeBytes(file.bytes!);
+      if (excel.tables.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Planilha vazia ou invalida.')),
+        );
+        return;
+      }
+      final table = excel.tables[excel.tables.keys.first];
+      if (table == null || table.rows.isEmpty) return;
+      final header = table.rows.first;
+      final colMap = <String, int>{};
+      for (var i = 0; i < header.length; i++) {
+        final val = header[i]?.value?.toString().toLowerCase().trim() ?? '';
+        colMap[val] = i;
+      }
+      String? findCol(List<String> aliases) {
+        for (final alias in aliases) {
+          if (colMap.containsKey(alias)) return alias;
+        }
+        return null;
+      }
+      final colCodigo = findCol(['codigo', 'container', 'container code', 'cod container', 'cod']);
+      final colCliente = findCol(['cliente', 'client', 'nome cliente', 'razao social']);
+      final colCodigoCliente = findCol(['codigo cliente', 'cod cliente', 'client code', 'cod cli']);
+      final colTipo = findCol(['tipo', 'type', 'tamanho', 'size']);
+      final colPeso = findCol(['peso', 'weight', 'peso kg', 'kg']);
+      final colPosicao = findCol(['posicao', 'posição', 'position', 'pos', 'lote']);
+      final colObs = findCol(['obs', 'observacao', 'observação', 'observation', 'notes']);
+      final items = <ContainerItem>[];
+      for (var r = 1; r < table.rows.length; r++) {
+        final row = table.rows[r];
+        String cell(String? col) => col != null && colMap[col] != null && colMap[col]! < row.length
+            ? (row[colMap[col]!]?.value?.toString() ?? '').trim()
+            : '';
+        final codigo = cell(colCodigo);
+        if (codigo.isEmpty) continue;
+        final pesoStr = cell(colPeso);
+        final peso = pesoStr.isNotEmpty ? parseWeight(pesoStr) : null;
+        final isCheio = peso != null && peso > 0;
+        String tipo = cell(colTipo).toUpperCase();
+        if (!['20 DRY', '40 DRY', '40 HC', 'REEFER'].contains(tipo)) {
+          if (tipo.contains('20')) tipo = '20 DRY';
+          else if (tipo.contains('HC') || tipo.contains('HIGH CUBE')) tipo = '40 HC';
+          else if (tipo.contains('40')) tipo = '40 DRY';
+          else if (tipo.contains('REEFER') || tipo.contains('REFR')) tipo = 'Reefer';
+          else tipo = '20 DRY';
+        }
+        if (tipo == 'REEFER') tipo = 'Reefer';
+        items.add(ContainerItem(
+          codigo: codigo.toUpperCase(),
+          codigoCliente: cell(colCodigoCliente).toUpperCase(),
+          cliente: cell(colCliente),
+          tipo: tipo,
+          posicao: cell(colPosicao).toUpperCase().replaceAll('.', '-'),
+          pesoKg: isCheio ? peso : null,
+          observacao: cell(colObs),
+          entrada: DateTime.now(),
+        ));
+      }
+      if (items.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhum container valido encontrado na planilha.')),
+        );
+        return;
+      }
+      if (widget.onImportarExcel != null) {
+        await widget.onImportarExcel!(items);
+      } else {
+        for (final item in items) {
+          widget.onSalvar(item);
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${items.length} container(es) importado(s) com sucesso.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao importar: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -3870,6 +4069,23 @@ class _EntradaPageState extends State<EntradaPage> {
               .textTheme
               .headlineSmall
               ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _importarExcel,
+            icon: const Icon(Icons.file_upload_outlined, size: 22),
+            label: const Text('Importar planilha Excel', style: TextStyle(fontSize: 16)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Importe um arquivo .xlsx. Se o container tiver peso, sera registrado como CHEIO. Se nao tiver, como VAZIO.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 16),
         Form(
@@ -4106,23 +4322,60 @@ class HistoricoPage extends StatelessWidget {
     required this.containers,
     required this.onRegistrarNoShow,
     this.onReintegrar,
+    this.onExcluirMovimento,
+    this.onLimparHistorico,
   });
 
   final List<MovementItem> movimentos;
   final List<ContainerItem> containers;
   final ValueChanged<ContainerItem> onRegistrarNoShow;
   final ValueChanged<ContainerItem>? onReintegrar;
+  final ValueChanged<MovementItem>? onExcluirMovimento;
+  final VoidCallback? onLimparHistorico;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          'Historico',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Historico',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (onLimparHistorico != null)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Limpar historico'),
+                      content: const Text('Deseja excluir todo o historico? Esta acao nao pode ser desfeita.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancelar'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Limpar'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) onLimparHistorico!();
+                },
+                icon: const Icon(Icons.delete_sweep, size: 18),
+                label: const Text('Limpar'),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         if (movimentos.isEmpty)
@@ -4160,9 +4413,39 @@ class HistoricoPage extends StatelessWidget {
                 ),
                 isThreeLine: true,
                 onTap: () => _abrirAcoesContainer(context, container, movimento, isSaida),
-                trailing: isSaida && container != null
-                    ? const Icon(Icons.restart_alt, size: 18, color: Colors.orange)
-                    : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onExcluirMovimento != null)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                        tooltip: 'Excluir movimento',
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Excluir movimento'),
+                              content: const Text('Deseja excluir este movimento?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Excluir'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) onExcluirMovimento!(movimento);
+                        },
+                      ),
+                    if (isSaida && container != null)
+                      const Icon(Icons.restart_alt, size: 18, color: Colors.orange),
+                  ],
+                ),
               );
             },
           ),
