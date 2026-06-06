@@ -2,16 +2,26 @@ const Auth = {
   currentUser: null,
 
   async login(nome, senha) {
-    const snap = await db.collection('usuarios').get();
-    for (const doc of snap.docs) {
-      const d = doc.data();
-      if (d.nome && d.senha && d.nome.toLowerCase() === nome.toLowerCase() && d.senha === senha) {
-        this.currentUser = { nome: d.nome, perfil: d.perfil || 'gate' };
-        localStorage.setItem('user', JSON.stringify(this.currentUser));
-        return this.currentUser;
+    try {
+      const snap = await db.collection('usuarios').get();
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        const docName = d.nome || doc.id;
+        const docSenha = d.senha || '';
+        if (docName && docName.toLowerCase() === nome.toLowerCase() && docSenha === senha) {
+          this.currentUser = { nome: docName, perfil: d.perfil || 'gate' };
+          localStorage.setItem('user', JSON.stringify(this.currentUser));
+          return this.currentUser;
+        }
       }
+      return null;
+    } catch (e) {
+      console.error('Erro login Firestore:', e.code, e.message);
+      if (e.code === 'permission-denied') {
+        throw new Error('Sem permissão para acessar dados. Verifique as regras do Firestore.');
+      }
+      throw new Error('Erro de conexão: ' + e.message);
     }
-    return null;
   },
 
   async resetPassword(nome, novaSenha) {

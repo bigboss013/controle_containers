@@ -31,17 +31,28 @@ async function doLogin(e) {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
+  const btn = e.target.querySelector('button[type="submit"]');
   errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
 
-  const u = await Auth.login(user, pass);
-  if (u) {
-    document.getElementById('page-login').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    Store.init();
-    setupNav();
-    Router.init();
-  } else {
-    errEl.textContent = 'Usuário ou senha inválidos.';
+  try {
+    const u = await Auth.login(user, pass);
+    if (u) {
+      document.getElementById('page-login').classList.add('hidden');
+      document.getElementById('app-shell').classList.remove('hidden');
+      Store.init();
+      setupNav();
+      Router.init();
+    } else {
+      errEl.textContent = 'Usuário ou senha inválidos.';
+    }
+  } catch (err) {
+    errEl.textContent = err.message;
+    console.error('Login error:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
   }
 }
 
