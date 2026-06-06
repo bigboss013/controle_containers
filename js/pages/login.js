@@ -45,10 +45,10 @@ async function doLogin(e) {
       setupNav();
       Router.init();
     } else {
-      errEl.innerHTML = 'Usuário ou senha inválidos.<br><small style="color:#888">Abrir F12 → Console para ver dados do Firestore</small>';
+      errEl.textContent = 'Usuário ou senha inválidos.';
     }
   } catch (err) {
-    errEl.textContent = err.message;
+    errEl.innerHTML = 'Erro: ' + err.message + '<br><small>Se for a primeira vez, aguarde 2 min e tente novamente.</small>';
     console.error('Login error:', err);
   } finally {
     btn.disabled = false;

@@ -33,41 +33,61 @@ const Store = {
   async refreshContainers() {
     try {
       this.containers = await FirestoreRest.getCollection('containers');
-      this.containers = this.containers.map(c => ({
-        ...c,
-        entrada: c.entrada instanceof Date ? c.entrada : new Date(c.entrada),
-        saida: c.saida ? (c.saida instanceof Date ? c.saida : new Date(c.saida)) : null,
-        deadline: c.deadline ? (c.deadline instanceof Date ? c.deadline : new Date(c.deadline)) : null,
-        agendamento: c.agendamento ? (c.agendamento instanceof Date ? c.agendamento : new Date(c.agendamento)) : null,
-      }));
-      this._notify('containers');
-    } catch (e) { console.error('Erro containers:', e); }
+      localStorage.setItem('cache_containers', JSON.stringify(this.containers));
+    } catch (e) {
+      console.warn('Containers offline, using cache');
+      const c = localStorage.getItem('cache_containers');
+      if (c) this.containers = JSON.parse(c);
+    }
+    this.containers = this.containers.map(c => ({
+      ...c,
+      entrada: c.entrada instanceof Date ? c.entrada : new Date(c.entrada),
+      saida: c.saida ? (c.saida instanceof Date ? c.saida : new Date(c.saida)) : null,
+      deadline: c.deadline ? (c.deadline instanceof Date ? c.deadline : new Date(c.deadline)) : null,
+      agendamento: c.agendamento ? (c.agendamento instanceof Date ? c.agendamento : new Date(c.agendamento)) : null,
+    }));
+    this._notify('containers');
   },
 
   async refreshMovimentos() {
     try {
       this.movimentos = await FirestoreRest.getCollection('movimentos');
-      this.movimentos = this.movimentos.map(m => ({
-        ...m,
-        data: m.data instanceof Date ? m.data : new Date(m.data),
-      }));
-      this.movimentos.sort((a, b) => (b.data || 0) - (a.data || 0));
-      this._notify('movimentos');
-    } catch (e) { console.error('Erro movimentos:', e); }
+      localStorage.setItem('cache_movimentos', JSON.stringify(this.movimentos));
+    } catch (e) {
+      console.warn('Movimentos offline, using cache');
+      const m = localStorage.getItem('cache_movimentos');
+      if (m) this.movimentos = JSON.parse(m);
+    }
+    this.movimentos = this.movimentos.map(m => ({
+      ...m,
+      data: m.data instanceof Date ? m.data : new Date(m.data),
+    }));
+    this.movimentos.sort((a, b) => (b.data || 0) - (a.data || 0));
+    this._notify('movimentos');
   },
 
   async refreshClientes() {
     try {
       this.clientes = await FirestoreRest.getCollection('clientes');
-      this._notify('clientes');
-    } catch (e) { console.error('Erro clientes:', e); }
+      localStorage.setItem('cache_clientes', JSON.stringify(this.clientes));
+    } catch (e) {
+      console.warn('Clientes offline, using cache');
+      const c = localStorage.getItem('cache_clientes');
+      if (c) this.clientes = JSON.parse(c);
+    }
+    this._notify('clientes');
   },
 
   async refreshUsuarios() {
     try {
       this.usuarios = await FirestoreRest.getCollection('usuarios');
-      this._notify('usuarios');
-    } catch (e) { console.error('Erro usuarios:', e); }
+      localStorage.setItem('cache_usuarios', JSON.stringify(this.usuarios));
+    } catch (e) {
+      console.warn('Usuarios offline, using cache');
+      const u = localStorage.getItem('cache_usuarios');
+      if (u) this.usuarios = JSON.parse(u);
+    }
+    this._notify('usuarios');
   },
 
   _notify(type) {

@@ -2,18 +2,26 @@ const Auth = {
   currentUser: null,
 
   async login(nome, senha) {
+    const cacheKey = 'usuarios_cache';
+    let users = [];
+
     try {
-      const user = await FirestoreRest.getDoc('usuarios', nome);
-      if (user && user.senha === senha) {
-        this.currentUser = { nome: user.id, perfil: user.perfil || 'gate' };
-        localStorage.setItem('user', JSON.stringify(this.currentUser));
-        return this.currentUser;
-      }
-      return null;
+      users = await FirestoreRest.getCollection('usuarios');
+      localStorage.setItem(cacheKey, JSON.stringify(users));
     } catch (e) {
-      console.error('Erro login:', e);
-      throw new Error('Erro de conexão: ' + e.message);
+      console.warn('Firestore offline, using cache:', e.message);
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) users = JSON.parse(cached);
+      else throw new Error('Sem conexão e sem dados em cache.');
     }
+
+    const user = users.find(u => u.id === nome || (u.nome && u.nome.toLowerCase() === nome.toLowerCase()));
+    if (user && user.senha === senha) {
+      this.currentUser = { nome: user.id, perfil: user.perfil || 'gate' };
+      localStorage.setItem('user', JSON.stringify(this.currentUser));
+      return this.currentUser;
+    }
+    return null;
   },
 
   async resetPassword(nome, novaSenha) {
