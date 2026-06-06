@@ -13,7 +13,7 @@ const Store = {
       this.refreshClientes(),
     ]);
     if (Auth.isAdmin()) await this.refreshUsuarios();
-    this._polling = setInterval(() => this.refreshAll(), 10000);
+    this._polling = setInterval(() => this.refreshAll(), 30000);
   },
 
   destroy() {

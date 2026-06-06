@@ -2,10 +2,22 @@ const API_KEY = 'AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA';
 const PROJECT = 'santos-transportes';
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
+async function fetchWithRetry(url, options, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    const resp = await fetch(url, options);
+    if (resp.status === 429) {
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      continue;
+    }
+    return resp;
+  }
+  throw new Error('Servidor ocupado. Tente novamente em alguns segundos.');
+}
+
 const FirestoreRest = {
   async getDoc(collection, id) {
     const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
-    const resp = await fetch(url);
+    const resp = await fetchWithRetry(url);
     if (resp.status === 404) return null;
     if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     const doc = await resp.json();
@@ -14,7 +26,7 @@ const FirestoreRest = {
 
   async getCollection(collection) {
     const url = `${BASE}/${collection}?key=${API_KEY}`;
-    const resp = await fetch(url);
+    const resp = await fetchWithRetry(url);
     if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     const data = await resp.json();
     return (data.documents || []).map(d => this._parseDoc(d));
@@ -22,7 +34,7 @@ const FirestoreRest = {
 
   async addDoc(collection, data) {
     const url = `${BASE}/${collection}?key=${API_KEY}`;
-    const resp = await fetch(url, {
+    const resp = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(this._toFirestoreFields(data)),
@@ -33,7 +45,7 @@ const FirestoreRest = {
 
   async setDoc(collection, id, data) {
     const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
-    const resp = await fetch(url, {
+    const resp = await fetchWithRetry(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(this._toFirestoreFields(data)),
@@ -44,7 +56,7 @@ const FirestoreRest = {
 
   async deleteDoc(collection, id) {
     const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
-    const resp = await fetch(url, { method: 'DELETE' });
+    const resp = await fetchWithRetry(url, { method: 'DELETE' });
     if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
   },
 
@@ -60,7 +72,7 @@ const FirestoreRest = {
         },
       },
     };
-    const resp = await fetch(url, {
+    const resp = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ structuredQuery }),
