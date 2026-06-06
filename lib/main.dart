@@ -2883,15 +2883,35 @@ class ContainerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Color borderColor = noShowActions
+        ? const Color(0xFFFCA5A5)
+        : const Color(0xFFE1E5E8);
+    Color? deadlineBgColor;
+    String? deadlineLabel;
+    if (item.deadline != null && item.status != ContainerStatus.saiu) {
+      final diff = item.deadline!.difference(DateTime.now()).inDays;
+      if (diff <= 0) {
+        borderColor = Colors.red;
+        deadlineBgColor = Colors.red.withValues(alpha: 0.08);
+        deadlineLabel = 'URGENTE';
+      } else if (diff <= 1) {
+        borderColor = Colors.red.shade400;
+        deadlineBgColor = Colors.red.withValues(alpha: 0.05);
+        deadlineLabel = 'URGENTE - ${diff}d';
+      } else if (diff <= 3) {
+        borderColor = Colors.amber.shade700;
+        deadlineBgColor = Colors.amber.withValues(alpha: 0.05);
+        deadlineLabel = 'Atenção - ${diff}d';
+      }
+    }
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: noShowActions
-              ? const Color(0xFFFCA5A5)
-              : const Color(0xFFE1E5E8),
+          color: borderColor,
+          width: deadlineLabel != null ? 2 : 1,
         ),
       ),
       child: InkWell(
@@ -2944,6 +2964,25 @@ class ContainerCard extends StatelessWidget {
                             : item.tipo,
                       ),
                     ),
+                    if (deadlineLabel != null) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: deadlineBgColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: borderColor,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(deadlineLabel,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: borderColor)),
+                      ),
+                    ],
                 ],
               ),
               const SizedBox(height: 8),
@@ -2962,6 +3001,16 @@ class ContainerCard extends StatelessWidget {
                     ? 'Aguardando posição'
                     : 'Posição ${positionLabel(item.posicao)}',
               ),
+              if (item.deadline != null)
+                InfoLine(
+                  icon: Icons.event_busy,
+                  texto: 'Deadline: ${formatDate(item.deadline!)}',
+                  cor: item.deadline!.difference(DateTime.now()).inDays <= 1
+                      ? Colors.red
+                      : item.deadline!.difference(DateTime.now()).inDays <= 3
+                          ? Colors.amber.shade700
+                          : Colors.green,
+                ),
               if (item.observacao.trim().isNotEmpty)
                 InfoLine(
                   icon: Icons.report_problem_outlined,
@@ -5689,10 +5738,11 @@ class HistoricoPage extends StatelessWidget {
 }
 
 class InfoLine extends StatelessWidget {
-  const InfoLine({super.key, required this.icon, required this.texto});
+  const InfoLine({super.key, required this.icon, required this.texto, this.cor});
 
   final IconData icon;
   final String texto;
+  final Color? cor;
 
   @override
   Widget build(BuildContext context) {
@@ -5700,9 +5750,9 @@ class InfoLine extends StatelessWidget {
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).colorScheme.secondary),
+          Icon(icon, size: 18, color: cor ?? Theme.of(context).colorScheme.secondary),
           const SizedBox(width: 8),
-          Expanded(child: Text(texto)),
+          Expanded(child: Text(texto, style: cor != null ? TextStyle(color: cor, fontWeight: FontWeight.w600) : null)),
         ],
       ),
     );
