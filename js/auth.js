@@ -2,35 +2,47 @@ const Auth = {
   currentUser: null,
 
   async login(nome, senha) {
-    const cacheKey = 'usuarios_cache';
-    let users = [];
-
     try {
-      users = await FirestoreRest.getCollection('usuarios');
-      localStorage.setItem(cacheKey, JSON.stringify(users));
+      const doc = await db.collection('usuarios').doc(nome).get();
+      if (doc.exists) {
+        const d = doc.data();
+        if (d.senha === senha) {
+          this.currentUser = { nome: doc.id, perfil: d.perfil || 'gate' };
+          localStorage.setItem('user', JSON.stringify(this.currentUser));
+          return this.currentUser;
+        }
+        return null;
+      }
+      return null;
     } catch (e) {
-      console.warn('Firestore offline, using cache:', e.message);
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) users = JSON.parse(cached);
-      else throw new Error('Sem conexão e sem dados em cache.');
+      console.warn('SDK failed, trying REST:', e.message);
+      return this._loginRest(nome, senha);
     }
+  },
 
-    const user = users.find(u => u.id === nome || (u.nome && u.nome.toLowerCase() === nome.toLowerCase()));
-    if (user && user.senha === senha) {
-      this.currentUser = { nome: user.id, perfil: user.perfil || 'gate' };
-      localStorage.setItem('user', JSON.stringify(this.currentUser));
-      return this.currentUser;
+  async _loginRest(nome, senha) {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/santos-transportes/databases/(default)/documents/usuarios/${nome}?key=AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA`;
+      const resp = await fetch(url);
+      if (!resp.ok) return null;
+      const doc = await resp.json();
+      const fields = doc.fields || {};
+      if (fields.senha?.stringValue === senha) {
+        this.currentUser = { nome: doc.name.split('/').pop(), perfil: fields.perfil?.stringValue || 'gate' };
+        localStorage.setItem('user', JSON.stringify(this.currentUser));
+        return this.currentUser;
+      }
+      return null;
+    } catch (e) {
+      throw new Error('Servidor ocupado. Aguarde 1-2 minutos.');
     }
-    return null;
   },
 
   async resetPassword(nome, novaSenha) {
     try {
-      await FirestoreRest.setDoc('usuarios', nome, { senha: novaSenha });
+      await db.collection('usuarios').doc(nome).update({ senha: novaSenha });
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   logout() {
