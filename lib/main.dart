@@ -1239,13 +1239,12 @@ class _HomePageState extends State<HomePage> {
     );
     try {
       final tempDir = Directory.systemTemp;
-      final filePath = '${tempDir.path}/atualizacao_$versao.apk';
-      final file = File(filePath);
+      final tempFile = File('${tempDir.path}/atualizacao_$versao.apk');
       final request = await HttpClient().getUrl(Uri.parse(url));
       final response = await request.close();
       final totalBytes = response.contentLength;
       int receivedBytes = 0;
-      final sink = file.openWrite();
+      final sink = tempFile.openWrite();
       await for (final chunk in response) {
         sink.add(chunk);
         receivedBytes += chunk.length;
@@ -1255,12 +1254,40 @@ class _HomePageState extends State<HomePage> {
       }
       await sink.flush();
       await sink.close();
-      if (mounted) Navigator.of(context).pop();
-      final result = await OpenFile.open(filePath,
-          type: 'application/vnd.android.package-archive');
-      if (result.type != ResultType.done && mounted) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      final dirResult = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Salvar APK em:',
+        lockParentWindow: false,
+      );
+      if (dirResult == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Download cancelado.')),
+          );
+        }
+        return;
+      }
+      final savePath = '$dirResult/controle_containers_$versao.apk';
+      await tempFile.copy(savePath);
+      await tempFile.delete();
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao abrir instalador: ${result.message}')),
+          SnackBar(
+            content: Text('Salvo em: $savePath'),
+            action: SnackBarAction(
+              label: 'Instalar',
+              onPressed: () async {
+                final result = await OpenFile.open(savePath,
+                    type: 'application/vnd.android.package-archive');
+                if (result.type != ResultType.done && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro: ${result.message}\nAtive "Fontes desconhecidas" nas Configurações > Apps.')),
+                  );
+                }
+              },
+            ),
+          ),
         );
       }
     } catch (e) {
