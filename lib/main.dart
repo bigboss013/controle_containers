@@ -3725,21 +3725,19 @@ class _EntradaPageState extends State<EntradaPage> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (date != null) {
-      final time = await showTimePicker(
-        context: context,
-        initialTime: _deadline != null
-            ? TimeOfDay.fromDateTime(_deadline!)
-            : const TimeOfDay(hour: 18, minute: 0),
+    if (!mounted || date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _deadline != null
+          ? TimeOfDay.fromDateTime(_deadline!)
+          : const TimeOfDay(hour: 18, minute: 0),
+    );
+    if (!mounted || time == null) return;
+    setState(() {
+      _deadline = DateTime(
+        date.year, date.month, date.day, time.hour, time.minute,
       );
-      if (time != null) {
-        setState(() {
-          _deadline = DateTime(
-            date.year, date.month, date.day, time.hour, time.minute,
-          );
-        });
-      }
-    }
+    });
   }
 
   Future<void> _importarExcel() async {
