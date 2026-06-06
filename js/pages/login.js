@@ -45,7 +45,7 @@ async function doLogin(e) {
       setupNav();
       Router.init();
     } else {
-      errEl.textContent = 'Usuário ou senha inválidos.';
+      errEl.innerHTML = 'Usuário ou senha inválidos.<br><small style="color:#888">Abrir F12 → Console para ver dados do Firestore</small>';
     }
   } catch (err) {
     errEl.textContent = err.message;

@@ -4,8 +4,10 @@ const Auth = {
   async login(nome, senha) {
     try {
       const snap = await db.collection('usuarios').get();
+      console.log('Usuarios encontrados:', snap.size);
       for (const doc of snap.docs) {
         const d = doc.data();
+        console.log('Doc:', doc.id, '->', JSON.stringify(d));
         const docName = d.nome || doc.id;
         const docSenha = d.senha || '';
         if (docName && docName.toLowerCase() === nome.toLowerCase() && docSenha === senha) {
@@ -14,6 +16,7 @@ const Auth = {
           return this.currentUser;
         }
       }
+      console.log('Nenhum match para:', nome);
       return null;
     } catch (e) {
       console.error('Erro login Firestore:', e.code, e.message);
