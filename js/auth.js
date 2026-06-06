@@ -3,46 +3,24 @@ const Auth = {
 
   async login(nome, senha) {
     try {
-      const doc = await db.collection('usuarios').doc(nome).get();
-      if (doc.exists) {
-        const d = doc.data();
-        if (d.senha === senha) {
-          this.currentUser = { nome: doc.id, perfil: d.perfil || 'gate' };
-          localStorage.setItem('user', JSON.stringify(this.currentUser));
-          return this.currentUser;
-        }
-        return null;
-      }
-      return null;
-    } catch (e) {
-      console.warn('SDK failed, trying REST:', e.message);
-      return this._loginRest(nome, senha);
-    }
-  },
-
-  async _loginRest(nome, senha) {
-    try {
-      const url = `https://firestore.googleapis.com/v1/projects/santos-transportes/databases/(default)/documents/usuarios/${nome}?key=AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA`;
-      const resp = await fetch(url);
-      if (!resp.ok) return null;
-      const doc = await resp.json();
-      const fields = doc.fields || {};
-      if (fields.senha?.stringValue === senha) {
-        this.currentUser = { nome: doc.name.split('/').pop(), perfil: fields.perfil?.stringValue || 'gate' };
+      const doc = await FirestoreRest.getDoc('usuarios', nome);
+      if (doc && doc.senha === senha) {
+        this.currentUser = { nome: doc.id || nome, perfil: doc.perfil || 'gate' };
         localStorage.setItem('user', JSON.stringify(this.currentUser));
         return this.currentUser;
       }
       return null;
     } catch (e) {
-      throw new Error('Servidor ocupado. Aguarde 1-2 minutos.');
+      console.warn('Login REST error:', e.message);
+      return null;
     }
   },
 
   async resetPassword(nome, novaSenha) {
     try {
-      await db.collection('usuarios').doc(nome).update({ senha: novaSenha });
+      await FirestoreRest.setDoc('usuarios', nome, { senha: novaSenha });
       return true;
-    } catch (e) { return false; }
+    } catch { return false; }
   },
 
   logout() {
@@ -53,8 +31,10 @@ const Auth = {
   getSavedUser() {
     const s = localStorage.getItem('user');
     if (s) {
-      this.currentUser = JSON.parse(s);
-      return this.currentUser;
+      try {
+        this.currentUser = JSON.parse(s);
+        return this.currentUser;
+      } catch {}
     }
     return null;
   },

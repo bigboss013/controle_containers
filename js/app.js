@@ -1,7 +1,3 @@
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
-}
-
 function setupNav() {
   const user = Auth.currentUser;
   const isAdmin = Auth.isAdmin();
@@ -29,6 +25,25 @@ function setupNav() {
     </button>`;
   }
   nav.innerHTML = navHtml;
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg || 'Carregando dados...';
+  document.getElementById('loading-overlay').classList.remove('hidden');
+}
+
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+async function enterApp() {
+  document.getElementById('page-login').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+  showLoading('Carregando dados...');
+  setupNav();
+  await Store.init();
+  hideLoading();
+  Router.navigate('dashboard', true);
 }
 
 function logout() {

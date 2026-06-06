@@ -75,7 +75,12 @@ function filterDashboard() {
   if (!container) return;
 
   if (list.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="icon">📦</div>Nenhum container encontrado</div>';
+    const hasCache = localStorage.getItem('cache_containers');
+    if (!hasCache) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📡</div>Carregando dados...<br><small>Se persistir, o servidor pode estar temporariamente indisponível.</small><br><button class="btn btn-outline btn-sm retry-btn" onclick="Store.retry();showLoading(\'Tentando novamente...\');setTimeout(()=>{hideLoading();filterDashboard()},3000)">🔄 Tentar novamente</button></div>';
+    } else {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📦</div>Nenhum container encontrado</div>';
+    }
     return;
   }
   container.innerHTML = list.map(c => renderContainerCard(c)).join('');

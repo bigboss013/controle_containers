@@ -14,6 +14,11 @@
 
   <div id="page-login"></div>
 
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">Carregando dados...</div>
+  </div>
+
   <div id="app-shell" class="app hidden">
     <div class="appbar">
       <div>
@@ -39,9 +44,6 @@
     <button class="fab" onclick="Router.navigate('ia')" title="Ana IA">🤖</button>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js"></script>
   <script src="js/firestore-rest.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/store.js"></script>

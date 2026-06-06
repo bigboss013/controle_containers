@@ -1,68 +1,71 @@
-const API_KEY = 'AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA';
-const PROJECT = 'santos-transportes';
-const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+const FIRESTORE_API_KEY = 'AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA';
+const FIRESTORE_PROJECT = 'santos-transportes';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/(default)/documents`;
 
-async function fetchWithRetry(url, options, retries = 3) {
+let requestQueue = Promise.resolve();
+
+async function fetchWithRetry(url, options, retries = 5) {
   for (let i = 0; i < retries; i++) {
     const resp = await fetch(url, options);
     if (resp.status === 429) {
-      const wait = 1000 * Math.pow(4, i);
+      const wait = Math.min(1000 * Math.pow(4, i), 60000);
       await new Promise(r => setTimeout(r, wait));
       continue;
     }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp;
   }
   throw new Error('Servidor ocupado. Tente novamente em alguns segundos.');
 }
 
 const FirestoreRest = {
+  _queue(fn) {
+    requestQueue = requestQueue.then(fn, fn);
+    return requestQueue;
+  },
+
   async getDoc(collection, id) {
-    const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collection}/${id}?key=${FIRESTORE_API_KEY}`;
     const resp = await fetchWithRetry(url);
     if (resp.status === 404) return null;
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     const doc = await resp.json();
     return this._parseDoc(doc);
   },
 
   async getCollection(collection) {
-    const url = `${BASE}/${collection}?key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collection}?key=${FIRESTORE_API_KEY}`;
     const resp = await fetchWithRetry(url);
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     const data = await resp.json();
     return (data.documents || []).map(d => this._parseDoc(d));
   },
 
   async addDoc(collection, data) {
-    const url = `${BASE}/${collection}?key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collection}?key=${FIRESTORE_API_KEY}`;
     const resp = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(this._toFirestoreFields(data)),
     });
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     return await resp.json();
   },
 
   async setDoc(collection, id, data) {
-    const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collection}/${id}?key=${FIRESTORE_API_KEY}`;
     const resp = await fetchWithRetry(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(this._toFirestoreFields(data)),
     });
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     return await resp.json();
   },
 
   async deleteDoc(collection, id) {
-    const url = `${BASE}/${collection}/${id}?key=${API_KEY}`;
-    const resp = await fetchWithRetry(url, { method: 'DELETE' });
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
+    const url = `${FIRESTORE_BASE}/${collection}/${id}?key=${FIRESTORE_API_KEY}`;
+    await fetchWithRetry(url, { method: 'DELETE' });
   },
 
   async queryCollection(collection, field, op, value) {
-    const url = `${BASE}/${collection}?key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}:runQuery?key=${FIRESTORE_API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId: collection }],
       where: {
@@ -78,9 +81,10 @@ const FirestoreRest = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ structuredQuery }),
     });
-    if (!resp.ok) throw new Error(`Firestore error ${resp.status}`);
     const data = await resp.json();
-    return (data.documents || []).map(d => this._parseDoc(d));
+    return data
+      .filter(r => r.document)
+      .map(r => this._parseDoc(r.document));
   },
 
   _parseDoc(doc) {
