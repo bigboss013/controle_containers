@@ -37,9 +37,16 @@ const Store = {
       localStorage.setItem('cache_' + collection, JSON.stringify(data));
       return data;
     } catch (e) {
-      console.warn(`${collection} SDK failed, using cache`);
-      const c = localStorage.getItem('cache_' + collection);
-      return c ? JSON.parse(c) : [];
+      console.warn(`${collection} SDK failed, trying REST`);
+      try {
+        const data = await FirestoreRest.getCollection(collection);
+        localStorage.setItem('cache_' + collection, JSON.stringify(data));
+        return data;
+      } catch (e2) {
+        console.warn(`${collection} REST also failed (${e2.message}), using cache`);
+        const c = localStorage.getItem('cache_' + collection);
+        return c ? JSON.parse(c) : [];
+      }
     }
   },
 
