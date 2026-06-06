@@ -288,6 +288,7 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _excluirUsuario(String nome) async {
     await FirestoreDb.removerUsuario(nome);
+    if (!mounted) return;
     setState(() => _usuarios.removeWhere((u) => u.nome == nome));
   }
 
@@ -408,7 +409,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _entrar() {
-    if (!_formKey.currentState!.validate()) {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
 
@@ -440,7 +441,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _redefinirSenha() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
 
@@ -457,11 +458,13 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     await widget.onRedefinirSenha(nome, _senhaController.text);
+    if (!mounted) return;
     setState(() {
       _redefinindoSenha = false;
       _senhaController.clear();
       _confirmarSenhaController.clear();
     });
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Senha redefinida. Entre novamente.')),
     );
@@ -483,6 +486,14 @@ class _LoginPageState extends State<LoginPage> {
       _senhaController.clear();
       _confirmarSenhaController.clear();
     });
+  }
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _senhaController.dispose();
+    _confirmarSenhaController.dispose();
+    super.dispose();
   }
 
   @override
@@ -735,7 +746,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
   }
 
   Future<void> _cadastrar() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
 
@@ -1350,6 +1361,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _limparDados() async {
     await FirestoreDb.limparTudo();
+    if (!mounted) return;
     setState(() {
       _containers.clear();
       _movimentos.clear();
@@ -1566,8 +1578,9 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
   }
 
-  void _excluirContainer(ContainerItem item) async {
+  Future<void> _excluirContainer(ContainerItem item) async {
     await FirestoreDb.removerContainer(item.codigo);
+    if (!mounted) return;
     setState(() {
       _containers.removeWhere((c) => c.codigo == item.codigo);
       _movimentos.removeWhere((m) => m.codigo == item.codigo);
@@ -1579,7 +1592,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _excluirMovimento(MovementItem movimento) async {
+  Future<void> _excluirMovimento(MovementItem movimento) async {
     setState(() {
       _movimentos.remove(movimento);
     });
@@ -1590,8 +1603,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _limparHistorico() async {
+  Future<void> _limparHistorico() async {
     await FirestoreDb.limparHistorico();
+    if (!mounted) return;
     setState(() {
       _movimentos.clear();
     });
@@ -1721,6 +1735,25 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: SafeArea(child: paginas[_abaAtual]),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => IaPage(
+                containers: _containers,
+                onMover: (item, novaPos) {
+                  _alterarPosicao(item, novaPos);
+                  setState(() {});
+                },
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.smart_toy, color: Colors.white),
+        label: const Text('Ana', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        backgroundColor: const Color(0xFF1565C0),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _abaAtual,
         onDestinationSelected: (index) => setState(() {
@@ -3543,9 +3576,17 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
     return ['Todos', ...sorted];
   }
 
+  Set<String> _posicoesComConflito = {};
+
+  void _analisarConflitos() {
+    final conflitos = IaOtimizacao.analisarConflitos(_yard);
+    _posicoesComConflito = conflitos.map((c) => c.posicao).toSet();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    _analisarConflitos();
     final filtered = _blocoFiltro == 'Todos'
         ? _yard
         : _yard.where((c) {
@@ -3718,11 +3759,13 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                   maxHeight - hi;
                                               final c = containersInStack[
                                                   heightNum];
-                                              final isEmpty = c == null;
-                                              final isHighlighted =
-                                                  c?.codigo ==
-                                                      widget
-                                                          .highlightCodigo;
+                                               final isEmpty = c == null;
+                                               final isHighlighted =
+                                                   c?.codigo ==
+                                                       widget
+                                                           .highlightCodigo;
+                                               final hasConflito =
+                                                   c != null && _posicoesComConflito.contains(c.posicao);
 
                                               Color bgColor;
                                               Color borderColor;
@@ -3828,12 +3871,15 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                                   3),
                                                       border:
                                                           Border.all(
-                                                        color:
-                                                            borderColor,
+                                                        color: hasConflito
+                                                            ? const Color(0xFFEF4444)
+                                                            : borderColor,
                                                         width:
                                                             isHighlighted
                                                                 ? 2.5
-                                                                : 1,
+                                                                : hasConflito
+                                                                    ? 2
+                                                                    : 1,
                                                       ),
                                                       boxShadow: isEmpty
                                                           ? null
@@ -3930,6 +3976,7 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                 _legendaItem(const Color(0xFFFBBF24), 'Reserva'),
                 _legendaItem(const Color(0xFF22C55E), 'Embarcado'),
                 _legendaItem(const Color(0xFFEF4444), 'No-Show'),
+                _legendaItem(const Color(0xFFEF4444), 'Conflito', isBordered: true),
               ],
             ),
           ),
@@ -3938,7 +3985,7 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
     );
   }
 
-  Widget _legendaItem(Color color, String label) {
+  Widget _legendaItem(Color color, String label, {bool isBordered = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3946,9 +3993,12 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
           width: 14,
           height: 14,
           decoration: BoxDecoration(
-            color: color,
+            color: color.withValues(alpha: isBordered ? 0.2 : 1),
             borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: Colors.grey.shade400, width: 0.5),
+            border: Border.all(
+              color: isBordered ? color : Colors.grey.shade400,
+              width: isBordered ? 2 : 0.5,
+            ),
           ),
         ),
         const SizedBox(width: 4),
@@ -4022,6 +4072,637 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
       ),
     );
   }
+}
+
+class IaConflito {
+  final ContainerItem container;
+  final String posicao;
+  final List<ContainerItem> bloqueando;
+  final int severidade;
+
+  const IaConflito({
+    required this.container,
+    required this.posicao,
+    required this.bloqueando,
+    required this.severidade,
+  });
+}
+
+class IaSugestao {
+  final String tipo;
+  final String titulo;
+  final String descricao;
+  final ContainerItem? container;
+  final String? posicaoOrigem;
+  final String? posicaoDestino;
+  final int prioridade;
+
+  const IaSugestao({
+    required this.tipo,
+    required this.titulo,
+    required this.descricao,
+    this.container,
+    this.posicaoOrigem,
+    this.posicaoDestino,
+    this.prioridade = 0,
+  });
+}
+
+class IaOtimizacao {
+  static int calcularPrioridade(ContainerItem c) {
+    int score = 0;
+    final now = DateTime.now();
+    if (c.deadline != null) {
+      final diff = c.deadline!.difference(now).inDays;
+      if (diff <= 0) {
+        score += 50;
+      } else if (diff <= 1) {
+        score += 40;
+      } else if (diff <= 3) {
+        score += 25;
+      } else if (diff <= 7) {
+        score += 15;
+      }
+    }
+    if (c.agendamento != null) {
+      final diff = c.agendamento!.difference(now).inDays;
+      if (diff <= 0) {
+        score += 40;
+      } else if (diff <= 2) {
+        score += 30;
+      } else if (diff <= 7) {
+        score += 20;
+      }
+    }
+    switch (c.status) {
+      case ContainerStatus.embarcado:
+        score += 20;
+        break;
+      case ContainerStatus.reserva:
+        score += 10;
+        break;
+      default:
+        break;
+    }
+    final diasNoPatio = now.difference(c.entrada).inDays;
+    if (diasNoPatio > 30) {
+      score += 10;
+    } else if (diasNoPatio > 14) {
+      score += 5;
+    }
+    return score;
+  }
+
+  static List<IaConflito> analisarConflitos(List<ContainerItem> patio) {
+    final conflitos = <IaConflito>[];
+    final layout = <String, Map<int?, Map<int, Map<int, ContainerItem>>>>{};
+    for (final c in patio.where((c) => c.posicao.isNotEmpty)) {
+      final (block, row) = parsePosition(c.posicao);
+      final pos = c.posicao.replaceAll('.', '-');
+      final parts = pos.split('-');
+      final sh = parts.length >= 2 ? parts[1] : '';
+      final stack = sh.isNotEmpty ? int.tryParse(sh[0]) ?? 1 : 1;
+      final height = sh.length >= 2 ? int.tryParse(sh[1]) ?? 1 : 1;
+      layout.putIfAbsent(block, () => {});
+      layout[block]!.putIfAbsent(row, () => {});
+      layout[block]![row]!.putIfAbsent(stack, () => {});
+      layout[block]![row]![stack]![height] = c;
+    }
+    for (final block in layout.keys) {
+      final rows = layout[block]!;
+      for (final row in rows.keys) {
+        final stacks = rows[row]!;
+        for (final stackNum in stacks.keys) {
+          final heights = stacks[stackNum]!;
+          final sortedHeights = heights.keys.toList()..sort();
+          if (sortedHeights.length <= 1) continue;
+          final containersOrdenados = sortedHeights
+              .map((h) => heights[h]!)
+              .toList();
+          final prioridades =
+              containersOrdenados.map((c) => calcularPrioridade(c)).toList();
+          for (int i = 0; i < containersOrdenados.length; i++) {
+            final bloqueando = <ContainerItem>[];
+            for (int j = i + 1; j < containersOrdenados.length; j++) {
+              if (prioridades[j] < prioridades[i]) {
+                bloqueando.add(containersOrdenados[j]);
+              }
+            }
+            if (bloqueando.isNotEmpty) {
+              conflitos.add(IaConflito(
+                container: containersOrdenados[i],
+                posicao: containersOrdenados[i].posicao,
+                bloqueando: bloqueando,
+                severidade: bloqueando.length,
+              ));
+            }
+          }
+        }
+      }
+    }
+    conflitos.sort((a, b) => b.severidade.compareTo(a.severidade));
+    return conflitos;
+  }
+
+  static List<IaSugestao> gerarSugestoes(List<ContainerItem> patio) {
+    final sugestoes = <IaSugestao>[];
+    final conflitos = analisarConflitos(patio);
+    final posicoesOcupadas = <String>{};
+    for (final c in patio.where((c) => c.posicao.isNotEmpty)) {
+      posicoesOcupadas.add(c.posicao);
+    }
+    for (final conflito in conflitos) {
+      final c = conflito.container;
+      final posicaoAtual = c.posicao;
+      final (block, row) = parsePosition(posicaoAtual);
+      final pos = posicaoAtual.replaceAll('.', '-');
+      final parts = pos.split('-');
+      final sh = parts.length >= 2 ? parts[1] : '';
+      final stack = sh.isNotEmpty ? int.tryParse(sh[0]) ?? 1 : 1;
+      String? melhorPosicao;
+      int menorConflito = conflito.severidade;
+      for (final testBlock in ['A', 'B', 'C', 'D']) {
+        for (int testStack = 1; testStack <= 6; testStack++) {
+          for (int testHeight = 1; testHeight <= 1; testHeight++) {
+            final testPos = '$testBlock-$testStack$testHeight';
+            if (posicoesOcupadas.contains(testPos)) continue;
+            final conflitosNessaPos = conflitos.where((outro) =>
+                outro.container != c &&
+                outro.posicao == testPos).length;
+            if (conflitosNessaPos < menorConflito) {
+              menorConflito = conflitosNessaPos;
+              melhorPosicao = testPos;
+            }
+          }
+        }
+      }
+      if (melhorPosicao != null) {
+        sugestoes.add(IaSugestao(
+          tipo: 'reposicionamento',
+          titulo: 'Mover ${c.codigo}',
+          descricao:
+              '${c.codigo} em $posicaoAtual está sob ${conflito.bloqueando.length} container(s). '
+              'Mover para $melhorPosicao evita ${conflito.bloqueando.length} remoção(ões).',
+          container: c,
+          posicaoOrigem: posicaoAtual,
+          posicaoDestino: melhorPosicao,
+          prioridade: calcularPrioridade(c),
+        ));
+      }
+    }
+    final semPosicao =
+        patio.where((c) => c.posicao.isEmpty && c.status != ContainerStatus.saiu);
+    for (final c in semPosicao) {
+      String? melhorPosicao;
+      for (final testBlock in ['A', 'B', 'C', 'D']) {
+        for (int testStack = 1; testStack <= 6; testStack++) {
+          final testPos = '$testBlock-$testStack' '1';
+          if (!posicoesOcupadas.contains(testPos)) {
+            melhorPosicao = testPos;
+            break;
+          }
+        }
+        if (melhorPosicao != null) break;
+      }
+      if (melhorPosicao != null) {
+        sugestoes.add(IaSugestao(
+          tipo: 'posicao',
+          titulo: 'Posicionar ${c.codigo}',
+          descricao: '${c.codigo} não possui posição. Sugestão: $melhorPosicao',
+          container: c,
+          posicaoDestino: melhorPosicao,
+          prioridade: 50,
+        ));
+      }
+    }
+    sugestoes.sort((a, b) => b.prioridade.compareTo(a.prioridade));
+    return sugestoes;
+  }
+
+  static int calcularScorePatio(List<ContainerItem> patio) {
+    if (patio.isEmpty) return 100;
+    final conflitos = analisarConflitos(patio);
+    final totalContainers = patio
+        .where((c) => c.status != ContainerStatus.saiu && c.posicao.isNotEmpty)
+        .length;
+    if (totalContainers == 0) return 100;
+    final penalidade = conflitos.fold<int>(
+        0, (sum, c) => sum + c.severidade * 10);
+    final score = 100 - penalidade;
+    return score.clamp(0, 100);
+  }
+}
+
+class IaPage extends StatefulWidget {
+  const IaPage({
+    super.key,
+    required this.containers,
+    required this.onMover,
+  });
+
+  final List<ContainerItem> containers;
+  final void Function(ContainerItem item, String novaPosicao) onMover;
+
+  @override
+  State<IaPage> createState() => _IaPageState();
+}
+
+class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
+  List<IaSugestao> _sugestoes = [];
+  int _scorePatio = 100;
+  bool _analysando = false;
+  AnimationController? _animController;
+  bool _mostrandoAnimacao = false;
+  IaSugestao? _sugestaoAnimacao;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _analisar();
+  }
+
+  @override
+  void dispose() {
+    _animController?.dispose();
+    super.dispose();
+  }
+
+  void _analisar() {
+    setState(() => _analysando = true);
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      final patio = widget.containers
+          .where((c) => c.status != ContainerStatus.saiu)
+          .toList();
+      setState(() {
+        _sugestoes = IaOtimizacao.gerarSugestoes(patio);
+        _scorePatio = IaOtimizacao.calcularScorePatio(patio);
+        _analysando = false;
+      });
+    });
+  }
+
+  void _aplicarSugestao(IaSugestao sugestao) {
+    if (sugestao.container == null || sugestao.posicaoDestino == null) return;
+    setState(() {
+      _mostrandoAnimacao = true;
+      _sugestaoAnimacao = sugestao;
+    });
+    _animController!.reset();
+    _animController!.forward().then((_) {
+      if (!mounted) return;
+      widget.onMover(sugestao.container!, sugestao.posicaoDestino!);
+      setState(() {
+        _mostrandoAnimacao = false;
+        _sugestaoAnimacao = null;
+      });
+      _analisar();
+    });
+  }
+
+  String _emojiScore() {
+    if (_scorePatio >= 80) return 'Excelente';
+    if (_scorePatio >= 60) return 'Bom';
+    if (_scorePatio >= 40) return 'Atenção';
+    return 'Crítico';
+  }
+
+  Color _corScore() {
+    if (_scorePatio >= 80) return const Color(0xFF22C55E);
+    if (_scorePatio >= 60) return const Color(0xFFF59E0B);
+    if (_scorePatio >= 40) return const Color(0xFFF97316);
+    return const Color(0xFFEF4444);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ana - Assistente IA'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reanalisar',
+            onPressed: _analisar,
+          ),
+        ],
+      ),
+      body: _mostrandoAnimacao
+          ? _buildAnimacao()
+          : Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: colorScheme.primaryContainer,
+                        child: Icon(Icons.smart_toy,
+                            color: colorScheme.primary, size: 32),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _analysando
+                                  ? 'Analisando o pátio...'
+                                  : 'Olá! Analisei o pátio.',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 16),
+                            ),
+                            if (!_analysando)
+                              Text(
+                                '${_sugestoes.length} sugestão(ões) encontrada(s)',
+                                style: TextStyle(
+                                    color: Colors.grey.shade600, fontSize: 13),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _corScore().withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: _corScore().withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CircularProgressIndicator(
+                              value: _scorePatio / 100,
+                              strokeWidth: 6,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor:
+                                  AlwaysStoppedAnimation(_corScore()),
+                            ),
+                            Center(
+                              child: Text('$_scorePatio',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 18,
+                                      color: _corScore())),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Saúde do Pátio',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15)),
+                            Text(_emojiScore(),
+                                style: TextStyle(
+                                    color: _corScore(),
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_analysando)
+                  const Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          Text('Ana está analisando...',
+                              style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_sugestoes.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle,
+                              color: const Color(0xFF22C55E), size: 64),
+                          const SizedBox(height: 12),
+                          const Text('Pátio otimizado!',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(
+                              'Nenhuma remoção necessária.',
+                              style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _sugestoes.length,
+                      itemBuilder: (_, i) {
+                        final s = _sugestoes[i];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      s.tipo == 'reposicionamento'
+                                          ? Icons.swap_horiz
+                                          : Icons.add_location_alt,
+                                      color: s.tipo == 'reposicionamento'
+                                          ? const Color(0xFFF59E0B)
+                                          : colorScheme.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(s.titulo,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(s.descricao,
+                                    style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 13)),
+                                if (s.posicaoOrigem != null &&
+                                    s.posicaoDestino != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Chip(
+                                        label: Text(s.posicaoOrigem!,
+                                            style: const TextStyle(
+                                                fontSize: 11)),
+                                        visualDensity:
+                                            VisualDensity.compact,
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        child: Icon(Icons.arrow_forward,
+                                            size: 16),
+                                      ),
+                                      Chip(
+                                        label: Text(s.posicaoDestino!,
+                                            style: const TextStyle(
+                                                fontSize: 11)),
+                                        visualDensity:
+                                            VisualDensity.compact,
+                                        backgroundColor: const Color(0xFF22C55E)
+                                            .withValues(alpha: 0.15),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: FilledButton.icon(
+                                    onPressed: () =>
+                                        _aplicarSugestao(s),
+                                    icon: const Icon(Icons.check,
+                                        size: 16),
+                                    label: const Text('Aplicar'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor:
+                                          const Color(0xFF22C55E),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildAnimacao() {
+    final sugestao = _sugestaoAnimacao;
+    if (sugestao == null) return const SizedBox.shrink();
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBuilder(
+            animation: _animController!,
+            builder: (_, __) {
+              final progress = _animController!.value;
+              return Column(
+                children: [
+                  Text(
+                    progress < 0.3
+                        ? 'Recolhendo ${sugestao.container!.codigo}...'
+                        : progress < 0.7
+                            ? 'Transportando...'
+                            : 'Posicionando em ${sugestao.posicaoDestino}...',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: 200,
+                    height: 120,
+                    child: CustomPaint(
+                      painter: _ReachStackerPainter(progress: progress),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(value: progress),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReachStackerPainter extends CustomPainter {
+  final double progress;
+  _ReachStackerPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final skyBlue = Paint()
+      ..color = const Color(0xFF1565C0)
+      ..style = PaintingStyle.fill;
+    final orange = Paint()
+      ..color = const Color(0xFFF59E0B)
+      ..style = PaintingStyle.fill;
+    final containerPaint = Paint()
+      ..color = const Color(0xFF1E40AF)
+      ..style = PaintingStyle.fill;
+    final ground = Paint()
+      ..color = Colors.grey.shade300
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+        Rect.fromLTWH(0, size.height - 10, size.width, 10), ground);
+    final truckX = size.width * 0.15 + (size.width * 0.5 * progress);
+    final truckY = size.height - 50;
+    canvas.drawRect(
+        Rect.fromLTWH(truckX, truckY, 50, 30), orange);
+    canvas.drawRect(
+        Rect.fromLTWH(truckX + 10, truckY - 8, 30, 8), orange);
+    canvas.drawRect(
+        Rect.fromLTWH(truckX + 5, truckY + 30, 10, 10), Paint()..color = Colors.grey.shade800);
+    canvas.drawRect(
+        Rect.fromLTWH(truckX + 35, truckY + 30, 10, 10), Paint()..color = Colors.grey.shade800);
+    final forkBaseY = truckY - 8;
+    final forkHeight = 40.0 + (progress < 0.3 ? progress * 30 : (1 - progress) * 30);
+    canvas.drawRect(
+        Rect.fromLTWH(truckX + 20, forkBaseY - forkHeight, 8, forkHeight),
+        skyBlue);
+    final containerY = forkBaseY - forkHeight - 20;
+    final containerX = truckX + 10;
+    canvas.drawRect(
+        Rect.fromLTWH(containerX, containerY, 30, 20), containerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReachStackerPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class EntradaPage extends StatefulWidget {
