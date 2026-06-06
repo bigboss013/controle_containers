@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><title>Firebase Test</title></head><body>
+<h2>Firebase Diagnostico</h2>
+<pre id='log'></pre>
+<script src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'></script>
+<script src='https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'></script>
+<script>
+const log = document.getElementById('log');
+function addLog(msg) { log.textContent += msg + '\n'; }
+try {
+  firebase.initializeApp({
+    apiKey: 'AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA',
+    authDomain: 'santos-transportes.firebaseapp.com',
+    projectId: 'santos-transportes',
+    storageBucket: 'santos-transportes.firebasestorage.app'
+  });
+  addLog('Firebase OK');
+  const db = firebase.firestore();
+  db.collection('usuarios').get().then(snap => {
+    addLog('Firestore OK - ' + snap.size + ' usuarios');
+    snap.forEach(d => addLog('  ' + d.id + ': ' + JSON.stringify(d.data())));
+  }).catch(e => addLog('ERRO Firestore: ' + e.code + ' / ' + e.message));
+} catch(e) { addLog('ERRO Init: ' + e.message); }
+</script>
+</body></html>
