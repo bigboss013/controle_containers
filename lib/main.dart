@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,8 +7,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 
@@ -62,7 +59,7 @@ class FirestoreDb {
         codigo: doc.id,
         codigoCliente: d['codigoCliente'] as String? ?? '',
         cliente: d['cliente'] as String? ?? '',
-        tipo: d['tipo'] as String? ?? '20 DRY',
+        tipo: d['tipo'] as String? ?? '20',
         posicao: d['posicao'] as String? ?? '',
         entrada: DateTime.tryParse(d['entrada'] as String? ?? '') ?? DateTime.now(),
         saida: d['saida'] != null ? DateTime.tryParse(d['saida'] as String) : null,
@@ -244,7 +241,6 @@ class _AppShellState extends State<AppShell> {
   AppUser? _usuario;
   final List<AppUser> _usuarios = [];
   bool _carregandoUsuarios = true;
-  String? _ultimoUsuarioNome;
   String? _usuarioSalvoNome;
   String? _usuarioSalvoSenha;
   @override
@@ -256,14 +252,8 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _carregarDadosLogin() async {
     final prefs = await SharedPreferences.getInstance();
-    _ultimoUsuarioNome = prefs.getString('ultimo_usuario');
     _usuarioSalvoNome = prefs.getString('usuario_salvo_nome');
     _usuarioSalvoSenha = prefs.getString('usuario_salvo_senha');
-  }
-
-  Future<void> _salvarUltimoUsuario(String nome) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ultimo_usuario', nome);
   }
 
   Future<void> _carregarUsuarios() async {
@@ -335,11 +325,9 @@ class _AppShellState extends State<AppShell> {
     if (usuario == null) {
       return LoginPage(
         usuarios: _usuarios,
-        ultimoUsuarioNome: _ultimoUsuarioNome,
         usuarioSalvoNome: _usuarioSalvoNome,
         usuarioSalvoSenha: _usuarioSalvoSenha,
         onEntrar: (novoUsuario) {
-          _salvarUltimoUsuario(novoUsuario.nome);
           setState(() => _usuario = novoUsuario);
         },
         onRedefinirSenha: _redefinirSenha,
@@ -360,7 +348,6 @@ class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
     required this.usuarios,
-    this.ultimoUsuarioNome,
     this.usuarioSalvoNome,
     this.usuarioSalvoSenha,
     required this.onEntrar,
@@ -368,7 +355,6 @@ class LoginPage extends StatefulWidget {
   });
 
   final List<AppUser> usuarios;
-  final String? ultimoUsuarioNome;
   final String? usuarioSalvoNome;
   final String? usuarioSalvoSenha;
   final ValueChanged<AppUser> onEntrar;
@@ -1129,8 +1115,6 @@ class _HomePageState extends State<HomePage> {
   final List<Cliente> _clientes = [];
   int _abaAtual = 0;
   int _dashboardResetKey = 0;
-  bool _deadlineBlink = true;
-
   Color get _deadlineAlertColor {
     final now = DateTime.now();
     for (final c in _containers) {
@@ -1155,76 +1139,6 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _carregarDados();
     _carregarClientes();
-    _iniciarDeadlineBlink();
-    _verificarAtualizacao();
-  }
-
-  void _iniciarDeadlineBlink() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() => _deadlineBlink = !_deadlineBlink);
-      _iniciarDeadlineBlink();
-    });
-  }
-
-  Future<void> _verificarAtualizacao() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final versaoAtual = info.version;
-
-      final client = HttpClient();
-      final request = await client.getUrl(
-        Uri.parse('https://api.github.com/repos/bigboss013/controle_containers/releases/latest'),
-      );
-      request.headers.set('Accept', 'application/vnd.github.v3+json');
-      request.headers.set('User-Agent', 'controle_containers');
-      final response = await request.close();
-      if (response.statusCode != 200) return;
-
-      final body = await response.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      final tag = data['tag_name'] as String?;
-      if (tag == null) return;
-
-      final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '').split('+')[0];
-      if (_versaoMaior(versaoRemota, versaoAtual)) {
-        String? urlDownload;
-        final assets = data['assets'] as List<dynamic>?;
-        if (assets != null) {
-          for (final asset in assets) {
-            final name = asset['name'] as String?;
-            if (name != null && name.endsWith('.apk')) {
-              urlDownload = asset['browser_download_url'] as String?;
-              break;
-            }
-          }
-        }
-        if (urlDownload == null) return;
-        if (!mounted) return;
-        _mostrarDialogAtualizacao(context, urlDownload);
-      }
-    } catch (_) {}
-  }
-
-  bool _versaoMaior(String a, String b) {
-    final partsA = a.split('.');
-    final partsB = b.split('.');
-    final maxLen = partsA.length > partsB.length ? partsA.length : partsB.length;
-    for (var i = 0; i < maxLen; i++) {
-      final va = i < partsA.length ? int.tryParse(partsA[i]) ?? 0 : 0;
-      final vb = i < partsB.length ? int.tryParse(partsB[i]) ?? 0 : 0;
-      if (va > vb) return true;
-      if (va < vb) return false;
-    }
-    return false;
-  }
-
-  void _mostrarDialogAtualizacao(BuildContext context, String urlDownload) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => DownloadDialog(urlDownload: urlDownload),
-    );
   }
 
   Future<void> _carregarClientes() async {
@@ -1266,7 +1180,7 @@ class _HomePageState extends State<HomePage> {
           codigo: 'TCLU7654321',
           codigoCliente: 'PORTO-109',
           cliente: 'Porto Sul',
-          tipo: '20 DRY',
+          tipo: '20',
           posicao: 'B-21',
           pesoKg: 16250,
           entrada: DateTime.now().subtract(const Duration(days: 1)),
@@ -1484,7 +1398,7 @@ class _HomePageState extends State<HomePage> {
           ),
           FilledButton(
             onPressed: () {
-              final novaPos = posController.text.trim().toUpperCase().replaceAll('.', '-');
+              final novaPos = normalizarPosicao(posController.text);
               if (novaPos.isEmpty) return;
               item.posicao = novaPos;
               Navigator.pop(ctx);
@@ -1691,15 +1605,8 @@ class _HomePageState extends State<HomePage> {
             label: 'Entrada',
           ),
           NavigationDestination(
-            icon: Icon(
-              Icons.warning,
-              color: _deadlineBlink ? _deadlineAlertColor : Colors.grey.shade400,
-              size: 24,
-            ),
-            selectedIcon: Icon(
-              Icons.warning,
-              color: _deadlineAlertColor,
-            ),
+            icon: Icon(Icons.warning, color: _deadlineAlertColor, size: 24),
+            selectedIcon: Icon(Icons.warning, color: _deadlineAlertColor),
             label: 'Deadline',
           ),
           const NavigationDestination(
@@ -1791,15 +1698,6 @@ class _DashboardPageState extends State<DashboardPage> {
       .where((c) =>
           c.status == ContainerStatus.embarcado && c.terminal != null)
       .toList();
-
-  Map<String, List<ContainerItem>> get _termaisAgrupados {
-    final map = <String, List<ContainerItem>>{};
-    for (final c in _embarqueItems) {
-      map.putIfAbsent(c.terminal!, () => []);
-      map[c.terminal]!.add(c);
-    }
-    return map;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2120,158 +2018,126 @@ class _DashboardPageState extends State<DashboardPage> {
                           labelText: 'Posição', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                        style: const TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: tipo,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo', border: OutlineInputBorder(),
+                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: tipo,
-                        decoration: const InputDecoration(
-                          labelText: 'Tipo', border: OutlineInputBorder(),
-                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        ),
-                        style: const TextStyle(fontSize: 14, color: Colors.black87),
-                        items: const [
-                          DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
-                          DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
-                          DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
-                          DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
-                        ],
-                        onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                      items: const [
+                        DropdownMenuItem(value: '20', child: Text('20')),
+                        DropdownMenuItem(value: '40', child: Text('40')),
+                        DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                        DropdownMenuItem(value: 'Open Top', child: Text('Open Top')),
+                        DropdownMenuItem(value: 'Flat Rack', child: Text('Flat Rack')),
+                        DropdownMenuItem(value: 'Tank', child: Text('Tank')),
+                      ],
+                      onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: terminalCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Terminal destino', border: OutlineInputBorder(),
+                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: terminalCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Terminal destino', border: OutlineInputBorder(),
-                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        ),
-                        style: const TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: navioCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Navio', border: OutlineInputBorder(),
+                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: navioCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Navio', border: OutlineInputBorder(),
-                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        ),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                textStyle: const TextStyle(fontSize: 13),
-                              ),
-                              onPressed: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: deadline ?? DateTime.now(),
-                                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: deadline ?? DateTime.now(),
+                                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (date == null) return;
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: deadline != null
+                                    ? TimeOfDay.fromDateTime(deadline!)
+                                    : const TimeOfDay(hour: 18, minute: 0),
+                              );
+                              if (time == null) return;
+                              setDialogState(() {
+                                deadline = DateTime(
+                                  date.year, date.month, date.day, time.hour, time.minute,
                                 );
-                                if (date == null) return;
-                                final time = await showTimePicker(
-                                  context: context,
-                                  initialTime: deadline != null
-                                      ? TimeOfDay.fromDateTime(deadline!)
-                                      : const TimeOfDay(hour: 18, minute: 0),
-                                );
-                                if (time == null) return;
-                                setDialogState(() {
-                                  deadline = DateTime(
-                                    date.year, date.month, date.day, time.hour, time.minute,
-                                  );
-                                });
-                              },
-                              icon: Icon(
-                                deadline != null ? Icons.event_busy : Icons.event_outlined,
-                                color: deadline != null ? Colors.red : null, size: 18,
-                              ),
-                              label: Text(
-                                deadline != null ? formatDate(deadline!) : 'Definir Deadline',
-                              ),
+                              });
+                            },
+                            icon: Icon(
+                              deadline != null ? Icons.event_busy : Icons.event_outlined,
+                              color: deadline != null ? Colors.red : null, size: 18,
+                            ),
+                            label: Text(
+                              deadline != null ? formatDate(deadline!) : 'Definir Deadline',
                             ),
                           ),
-                          if (deadline != null) ...[
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                              tooltip: 'Remover deadline',
-                              onPressed: () => setDialogState(() => deadline = null),
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                              padding: EdgeInsets.zero,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: obsCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Observação', border: OutlineInputBorder(),
-                          isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                        style: const TextStyle(fontSize: 14),
-                        minLines: 2, maxLines: 3,
+                        if (deadline != null) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                            tooltip: 'Remover deadline',
+                            onPressed: () => setDialogState(() => deadline = null),
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: obsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Observação', border: OutlineInputBorder(),
+                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      const SizedBox(height: 12),
-                      const Text('Histórico de movimentações',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      ...widget.movimentos
-                          .where((m) => m.codigo == container.codigo)
-                          .take(10)
-                          .map((m) => Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              children: [
-                                Icon(iconForMovement(m.tipo), size: 16, color: Colors.grey),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text('${m.tipo} - ${formatDate(m.data)}',
-                                      style: const TextStyle(fontSize: 12)),
-                                ),
-                              ],
-                            ),
-                          )),
-                    ],
-                  ),
+                      style: const TextStyle(fontSize: 14),
+                      minLines: 2, maxLines: 3,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancelar'),
-                    ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
                   ),
-                  if (container.posicao.isNotEmpty &&
-                      container.status != ContainerStatus.saiu) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _confirmarSaida(context, container);
-                        },
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Saída'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
-                        container.cliente = cliCtrl.text.trim();
-                        container.posicao = posCtrl.text.trim().toUpperCase().replaceAll('.', '-');
-                        container.tipo = tipo;
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      container.codigoCliente = codCliCtrl.text.trim().toUpperCase();
+                      container.cliente = cliCtrl.text.trim();
+                      container.posicao = normalizarPosicao(posCtrl.text);
+                      container.tipo = tipo;
                         container.terminal = terminalCtrl.text.trim().isEmpty
                             ? null : terminalCtrl.text.trim();
                         container.navio = navioCtrl.text.trim().isEmpty
@@ -2292,32 +2158,6 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     ),
     );
-  }
-
-  Future<void> _confirmarSaida(
-      BuildContext context, ContainerItem container) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar saída'),
-        content: Text(
-            'Registrar saída do container ${container.codigo}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmar',
-                style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      widget.onSaida(container);
-    }
   }
 
   void _abrirDialogMapa(BuildContext context, ContainerItem container) {
@@ -3031,7 +2871,7 @@ class ContainerCard extends StatelessWidget {
             ),
             FilledButton(
               onPressed: () {
-                final novaPosicao = controller.text.trim().toUpperCase().replaceAll('.', '-');
+                final novaPosicao = normalizarPosicao(controller.text);
                 if (novaPosicao.isNotEmpty) {
                   onMover(novaPosicao);
                 }
@@ -3262,131 +3102,6 @@ class ContainerCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class DownloadDialog extends StatefulWidget {
-  const DownloadDialog({super.key, required this.urlDownload});
-  final String urlDownload;
-  @override
-  State<DownloadDialog> createState() => _DownloadDialogState();
-}
-
-class _DownloadDialogState extends State<DownloadDialog> {
-  bool _iniciado = false;
-  bool _erro = false;
-
-  Future<void> _deletarApkAntigo() async {
-    try {
-      final dir = Directory('/storage/emulated/0/Download');
-      if (await dir.exists()) {
-        final files = dir.listSync().where(
-          (f) => f is File && f.path.endsWith('app-release.apk'));
-        for (final f in files) {
-          await (f as File).delete();
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _baixar() async {
-    await _deletarApkAntigo();
-    try {
-      await launchUrl(
-        Uri.parse(widget.urlDownload),
-        mode: LaunchMode.platformDefault,
-      );
-      if (mounted) setState(() => _iniciado = true);
-    } catch (e) {
-      if (mounted) setState(() => _erro = true);
-    }
-  }
-
-  Future<void> _instalar() async {
-    try {
-      await launchUrl(
-        Uri.parse(widget.urlDownload),
-        mode: LaunchMode.platformDefault,
-      );
-    } catch (_) {}
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Atualização disponível'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.system_update, color: Color(0xFF1565C0), size: 48),
-          const SizedBox(height: 12),
-          if (_erro)
-            const Text(
-              'Não foi possível abrir o navegador.\n'
-              'Acesse manualmente o link abaixo:\n',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.red, fontSize: 13),
-            ),
-          if (!_iniciado && !_erro) ...[
-            const Text('Nova versão disponível para download.',
-                textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            const Text(
-              'O download será feito pelo navegador.\n'
-              'Após baixar, toque em "Instalar".\n'
-              'Se o Play Protect perguntar, toque em "Instalar mesmo assim".\n'
-              'Se o Play Protect bloquear, abra o gerenciador de arquivos,\n'
-              'va em Downloads e instale manualmente o APK.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-          ] else if (_iniciado) ...[
-            const Text('Download iniciado no navegador!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text(
-              'Após o download, toque em "Instalar".\n'
-              'Se o Play Protect bloquear, abra o app Arquivos,\n'
-              'va em Downloads e toque no APK baixado.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-          ],
-          if (_erro) ...[
-            SelectableText(
-              widget.urlDownload,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: Colors.blue),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Fechar'),
-        ),
-        if (_iniciado)
-          FilledButton.icon(
-            onPressed: _instalar,
-            icon: const Icon(Icons.download_done),
-            label: const Text('Instalar'),
-          ),
-        if (_erro)
-          FilledButton.icon(
-            onPressed: _baixar,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Tentar novamente'),
-          ),
-        if (!_iniciado && !_erro)
-          FilledButton.icon(
-            onPressed: _baixar,
-            icon: const Icon(Icons.open_in_browser),
-            label: const Text('Baixar e Instalar'),
-          ),
-      ],
     );
   }
 }
@@ -3701,7 +3416,7 @@ class _EntradaPageState extends State<EntradaPage> {
   String? _fotoAvariaPath;
   bool _cheio = true;
   bool _isScanning = false;
-  String _tipo = '20 DRY';
+  String _tipo = '20';
   DateTime? _deadline;
 
   bool get _podeInformarPosicao =>
@@ -3907,7 +3622,7 @@ class _EntradaPageState extends State<EntradaPage> {
         cliente: _clienteController.text.trim(),
         tipo: _tipo,
         posicao: _podeInformarPosicao
-            ? _posicaoController.text.trim().toUpperCase().replaceAll('.', '-')
+            ? normalizarPosicao(_posicaoController.text)
             : '',
         pesoKg: _cheio ? parseWeight(_pesoController.text) : null,
         observacao: _observacaoController.text.trim(),
@@ -4010,20 +3725,24 @@ class _EntradaPageState extends State<EntradaPage> {
         final peso = pesoStr.isNotEmpty ? parseWeight(pesoStr) : null;
         final isCheio = peso != null && peso > 0;
         String tipo = cell(colTipo).toUpperCase();
-        if (!['20 DRY', '40 DRY', '40 HC', 'REEFER'].contains(tipo)) {
-          if (tipo.contains('20')) tipo = '20 DRY';
-          else if (tipo.contains('HC') || tipo.contains('HIGH CUBE')) tipo = '40 HC';
-          else if (tipo.contains('40')) tipo = '40 DRY';
+        if (!['20', '40', 'REEFER', 'OPEN TOP', 'FLAT RACK', 'TANK'].contains(tipo)) {
+          if (tipo.contains('20')) tipo = '20';
           else if (tipo.contains('REEFER') || tipo.contains('REFR')) tipo = 'Reefer';
-          else tipo = '20 DRY';
+          else if (tipo.contains('OPEN') || tipo.contains('TOP')) tipo = 'Open Top';
+          else if (tipo.contains('FLAT') || tipo.contains('RACK')) tipo = 'Flat Rack';
+          else if (tipo.contains('TANK')) tipo = 'Tank';
+          else if (tipo.contains('40')) tipo = '40';
+          else tipo = '20';
         }
         if (tipo == 'REEFER') tipo = 'Reefer';
+        if (tipo == 'FLAT RACK') tipo = 'Flat Rack';
+        if (tipo == 'OPEN TOP') tipo = 'Open Top';
         items.add(ContainerItem(
           codigo: codigo.toUpperCase(),
           codigoCliente: cell(colCodigoCliente).toUpperCase(),
           cliente: cell(colCliente),
           tipo: tipo,
-          posicao: cell(colPosicao).toUpperCase().replaceAll('.', '-'),
+          posicao: normalizarPosicao(cell(colPosicao)),
           pesoKg: isCheio ? peso : null,
           observacao: cell(colObs),
           entrada: DateTime.now(),
@@ -4205,10 +3924,12 @@ class _EntradaPageState extends State<EntradaPage> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 items: const [
-                  DropdownMenuItem(value: '20 DRY', child: Text('20 DRY', style: TextStyle(fontSize: 17))),
-                  DropdownMenuItem(value: '40 DRY', child: Text('40 DRY', style: TextStyle(fontSize: 17))),
-                  DropdownMenuItem(value: '40 HC', child: Text('40 HC', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: '20', child: Text('20', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: '40', child: Text('40', style: TextStyle(fontSize: 17))),
                   DropdownMenuItem(value: 'Reefer', child: Text('Reefer', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: 'Open Top', child: Text('Open Top', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: 'Flat Rack', child: Text('Flat Rack', style: TextStyle(fontSize: 17))),
+                  DropdownMenuItem(value: 'Tank', child: Text('Tank', style: TextStyle(fontSize: 17))),
                 ],
                 onChanged: (value) => setState(() => _tipo = value ?? _tipo),
               ),
@@ -4544,7 +4265,7 @@ class HistoricoPage extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-                      final novaPos = posController.text.trim().toUpperCase().replaceAll('.', '-');
+                      final novaPos = normalizarPosicao(posController.text);
                       if (novaPos.isEmpty) return;
                       container.posicao = novaPos;
               onReintegrar!(container);
@@ -4839,10 +4560,12 @@ class DeadlinePage extends StatelessWidget {
                         ),
                         style: const TextStyle(fontSize: 14, color: Colors.black87),
                         items: const [
-                          DropdownMenuItem(value: '20 DRY', child: Text('20 DRY')),
-                          DropdownMenuItem(value: '40 DRY', child: Text('40 DRY')),
-                          DropdownMenuItem(value: '40 HC', child: Text('40 HC')),
+                          DropdownMenuItem(value: '20', child: Text('20')),
+                          DropdownMenuItem(value: '40', child: Text('40')),
                           DropdownMenuItem(value: 'Reefer', child: Text('Reefer')),
+                          DropdownMenuItem(value: 'Open Top', child: Text('Open Top')),
+                          DropdownMenuItem(value: 'Flat Rack', child: Text('Flat Rack')),
+                          DropdownMenuItem(value: 'Tank', child: Text('Tank')),
                         ],
                         onChanged: (v) => setDialogState(() => tipo = v ?? tipo),
                       ),
@@ -4944,7 +4667,7 @@ class DeadlinePage extends StatelessWidget {
                       onPressed: () {
                         c.codigoCliente = codCliCtrl.text.trim().toUpperCase();
                         c.cliente = cliCtrl.text.trim();
-                        c.posicao = posCtrl.text.trim().toUpperCase().replaceAll('.', '-');
+                        c.posicao = normalizarPosicao(posCtrl.text);
                         c.tipo = tipo;
                         c.terminal = terminalCtrl.text.trim().isEmpty
                             ? null : terminalCtrl.text.trim();
@@ -4964,10 +4687,9 @@ class DeadlinePage extends StatelessWidget {
           ),
         ),
       ),
-    ),
-    );
+    ));
   }
-
+ 
   void _abrirMapa(BuildContext context, ContainerItem c) {
     final pos = c.posicao.replaceAll('.', '-');
     final block = pos.split('-').isNotEmpty
@@ -5095,8 +4817,20 @@ ContainerStatus containerStatusFromName(String? name) {
 /// Parse position format: A-14 (block A, stack 1, height 4)
 /// or A5-34 (block A, row 5, stack 3, height 4)
 /// Returns (block, row) where row is null if not specified.
+String normalizarPosicao(String pos) {
+  String p = pos.trim().toUpperCase().replaceAll('.', '-');
+  if (p.contains('-')) return p;
+  final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(p);
+  if (match == null) return p;
+  final letters = match.group(1)!;
+  final digits = match.group(2)!;
+  if (digits.length == 2) return '$letters-${digits}';
+  if (digits.length == 3) return '$letters${digits[0]}-${digits.substring(1)}';
+  return p;
+}
+
 (String block, int? row) parsePosition(String pos) {
-  final normalized = pos.replaceAll('.', '-');
+  final normalized = normalizarPosicao(pos);
   final parts = normalized.split('-');
   if (parts.length < 2) return (normalized, null);
   final blockMatch = RegExp(r'^([A-Z]+)(\d+)?$').firstMatch(parts[0]);
