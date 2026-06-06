@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:open_file/open_file.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -13,6 +13,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class FirestoreDb {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -1685,6 +1686,7 @@ class _HomePageState extends State<HomePage> {
             _registrarEntrada(item);
           }
         },
+        isAdmin: isAdmin,
       ),
       DeadlinePage(
         containers: _containers,
@@ -1715,6 +1717,7 @@ class _HomePageState extends State<HomePage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        if (!mounted) return;
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -1732,8 +1735,8 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         );
-        if (confirm == true) {
-          exit(0);
+        if (confirm == true && mounted) {
+          SystemNavigator.pop();
         }
       },
       child: Scaffold(
@@ -2261,14 +2264,14 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             onPressed: () async {
                               final date = await showDatePicker(
-                                context: context,
+                                context: ctx,
                                 initialDate: deadline ?? DateTime.now(),
                                 firstDate: DateTime.now().subtract(const Duration(days: 365)),
                                 lastDate: DateTime.now().add(const Duration(days: 365)),
                               );
-                              if (date == null) return;
+                              if (date == null || !ctx.mounted) return;
                               final time = await showTimePicker(
-                                context: context,
+                                context: ctx,
                                 initialTime: deadline != null
                                     ? TimeOfDay.fromDateTime(deadline!)
                                     : const TimeOfDay(hour: 18, minute: 0),
@@ -2421,7 +2424,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     ).then((posicao) {
       if (posicao != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(content: Text('Posicao $posicao - use Entrada para adicionar')),
         );
       }
@@ -2723,7 +2726,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       prefixIcon: Icon(Icons.access_time),
                       border: OutlineInputBorder(),
                     ),
-                    child: Text(horaAgendamento.format(context)),
+                    child: Text(horaAgendamento.format(ctx)),
                   ),
                 ),
               ],
@@ -2738,7 +2741,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _abrirDetalhesContainer(context, item);
                 },
                 child: const FittedBox(
                   fit: BoxFit.scaleDown,
@@ -2755,7 +2757,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 onPressed: () {
                   final navio = navioCtrl.text.trim();
                   if (navio.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(ctx).showSnackBar(
                       const SnackBar(content: Text('Informe o nome do navio.')),
                     );
                     return;
@@ -3806,8 +3808,8 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                     0xFF22C55E);
                                                 borderColor = const Color(
                                                     0xFF16A34A);
-                                              } else {
-                                                switch (c!.status) {
+                                               } else {
+                                                 switch (c.status) {
                                                   case ContainerStatus
                                                         .embarcado:
                                                     bgColor =
@@ -3872,11 +3874,11 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                             heightNum)
                                                     : () => widget
                                                         .onContainerTap
-                                                        ?.call(c!),
+                                                        ?.call(c),
                                                 onLongPress: c != null
                                                     ? () =>
                                                         _mostrarTooltip(
-                                                            context, c!)
+                                                            context, c)
                                                     : null,
                                                 child: Tooltip(
                                                   message: c != null
@@ -3929,7 +3931,7 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                       child: Text(
                                                         isEmpty
                                                             ? '-'
-                                                            : '${c!.codigo.substring(c.codigo.length > 4 ? c.codigo.length - 4 : 0)}',
+                                                            : '${c.codigo.substring(c.codigo.length > 4 ? c.codigo.length - 4 : 0)}',
                                                         style: TextStyle(
                                                           fontSize: isEmpty
                                                               ? 10
@@ -4241,11 +4243,6 @@ class IaOtimizacao {
     for (final conflito in conflitos) {
       final c = conflito.container;
       final posicaoAtual = c.posicao;
-      final (block, row) = parsePosition(posicaoAtual);
-      final pos = posicaoAtual.replaceAll('.', '-');
-      final parts = pos.split('-');
-      final sh = parts.length >= 2 ? parts[1] : '';
-      final stack = sh.isNotEmpty ? int.tryParse(sh[0]) ?? 1 : 1;
       String? melhorPosicao;
       int menorConflito = conflito.severidade;
       for (final testBlock in ['A', 'B', 'C', 'D']) {
@@ -4341,6 +4338,9 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
   AnimationController? _animController;
   bool _mostrandoAnimacao = false;
   IaSugestao? _sugestaoAnimacao;
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _escutando = false;
+  String _textoReconhecido = '';
 
   @override
   void initState() {
@@ -4349,13 +4349,59 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(seconds: 3),
     );
+    _iniciarSpeech();
     _analisar();
   }
 
   @override
   void dispose() {
     _animController?.dispose();
+    _speech.cancel();
     super.dispose();
+  }
+
+  Future<void> _iniciarSpeech() async {
+    await _speech.initialize(
+      onError: (e) => setState(() => _escutando = false),
+      onStatus: (s) {
+        if (s == 'done' || s == 'notListening') {
+          if (mounted) setState(() => _escutando = false);
+        }
+      },
+    );
+  }
+
+  Future<void> _alternarMicrofone() async {
+    if (_escutando) {
+      await _speech.stop();
+      setState(() => _escutando = false);
+    } else {
+      setState(() {
+        _escutando = true;
+        _textoReconhecido = '';
+      });
+      await _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          setState(() => _textoReconhecido = result.recognizedWords);
+          if (result.finalResult) {
+            _processarComandoVoz(result.recognizedWords);
+          }
+        },
+        listenMode: stt.ListenMode.dictation,
+      );
+    }
+  }
+
+  void _processarComandoVoz(String texto) {
+    final t = texto.toLowerCase();
+    if (t.contains('analis') || t.contains('verificar') || t.contains('cheque')) {
+      _analisar();
+    } else if (t.contains('sugere') || t.contains('dica') || t.contains('otimiz')) {
+      _analisar();
+    } else if (t.contains('limpar') || t.contains('reiniciar')) {
+      _analisar();
+    }
   }
 
   void _analisar() {
@@ -4413,6 +4459,12 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
         title: const Text('Ana - Assistente IA'),
         actions: [
           IconButton(
+            icon: Icon(_escutando ? Icons.mic : Icons.mic_none,
+                color: _escutando ? Colors.red : null),
+            tooltip: _escutando ? 'Parar microfone' : 'Falar com Ana',
+            onPressed: _alternarMicrofone,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Reanalisar',
             onPressed: _analisar,
@@ -4451,6 +4503,11 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
                                 style: TextStyle(
                                     color: Colors.grey.shade600, fontSize: 13),
                               ),
+                            if (_escutando)
+                              Text('Ouvindo... $_textoReconhecido',
+                                  style: const TextStyle(
+                                      color: Colors.red, fontSize: 12,
+                                      fontStyle: FontStyle.italic)),
                           ],
                         ),
                       ),
@@ -4691,7 +4748,6 @@ class _ReachStackerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
     final skyBlue = Paint()
       ..color = const Color(0xFF1565C0)
       ..style = PaintingStyle.fill;
@@ -4740,6 +4796,7 @@ class EntradaPage extends StatefulWidget {
     required this.onSalvar,
     required this.onCadastrarCliente,
     this.onImportarExcel,
+    this.isAdmin = false,
   });
 
   final UserRole perfil;
@@ -4747,6 +4804,7 @@ class EntradaPage extends StatefulWidget {
   final ValueChanged<ContainerItem> onSalvar;
   final ValueChanged<Cliente> onCadastrarCliente;
   final Future<void> Function(List<ContainerItem> items)? onImportarExcel;
+  final bool isAdmin;
 
   @override
   State<EntradaPage> createState() => _EntradaPageState();
@@ -5133,23 +5191,25 @@ class _EntradaPageState extends State<EntradaPage> {
               ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+        if (widget.isAdmin) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _importarExcel,
+              icon: const Icon(Icons.file_upload_outlined, size: 22),
+              label: const Text('Importar planilha Excel', style: TextStyle(fontSize: 16)),
             ),
-            onPressed: _importarExcel,
-            icon: const Icon(Icons.file_upload_outlined, size: 22),
-            label: const Text('Importar planilha Excel', style: TextStyle(fontSize: 16)),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Importe um arquivo .xlsx. Se o container tiver peso, será registrado como CHEIO. Se não tiver, como VAZIO.',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            'Importe um arquivo .xlsx. Se o container tiver peso, será registrado como CHEIO. Se não tiver, como VAZIO.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 16),
+        ],
         Form(
           key: _formKey,
           child: Column(
@@ -5944,14 +6004,14 @@ class DeadlinePage extends StatelessWidget {
                               ),
                               onPressed: () async {
                                 final date = await showDatePicker(
-                                  context: context,
+                                  context: ctx,
                                   initialDate: deadline ?? DateTime.now(),
                                   firstDate: DateTime.now().subtract(const Duration(days: 365)),
                                   lastDate: DateTime.now().add(const Duration(days: 365)),
                                 );
-                                if (date == null) return;
+                                if (date == null || !ctx.mounted) return;
                                 final time = await showTimePicker(
-                                  context: context,
+                                  context: ctx,
                                   initialTime: deadline != null
                                       ? TimeOfDay.fromDateTime(deadline!)
                                       : const TimeOfDay(hour: 18, minute: 0),
