@@ -3,62 +3,73 @@ const Store = {
   movimentos: [],
   clientes: [],
   usuarios: [],
-  listeners: [],
+  _listeners: {},
+  _polling: null,
 
-  init() {
-    this._listenContainers();
-    this._listenMovimentos();
-    this._listenClientes();
-    if (Auth.isAdmin()) this._listenUsuarios();
+  async init() {
+    await Promise.all([
+      this.refreshContainers(),
+      this.refreshMovimentos(),
+      this.refreshClientes(),
+    ]);
+    if (Auth.isAdmin()) await this.refreshUsuarios();
+    this._polling = setInterval(() => this.refreshAll(), 10000);
   },
 
   destroy() {
-    this.listeners.forEach(u => u());
-    this.listeners = [];
+    if (this._polling) clearInterval(this._polling);
+    this._listeners = {};
   },
 
-  _listenContainers() {
-    const unsub = db.collection('containers').onSnapshot(snap => {
-      this.containers = snap.docs.map(d => ({
-        id: d.id, ...d.data(),
-        entrada: d.data().entrada?.toDate?.() || new Date(d.data().entrada),
-        saida: d.data().saida?.toDate?.() || (d.data().saida ? new Date(d.data().saida) : null),
-        deadline: d.data().deadline?.toDate?.() || (d.data().deadline ? new Date(d.data().deadline) : null),
-        agendamento: d.data().agendamento?.toDate?.() || (d.data().agendamento ? new Date(d.data().agendamento) : null),
+  async refreshAll() {
+    await Promise.all([
+      this.refreshContainers(),
+      this.refreshMovimentos(),
+      this.refreshClientes(),
+    ]);
+    if (Auth.isAdmin()) await this.refreshUsuarios();
+  },
+
+  async refreshContainers() {
+    try {
+      this.containers = await FirestoreRest.getCollection('containers');
+      this.containers = this.containers.map(c => ({
+        ...c,
+        entrada: c.entrada instanceof Date ? c.entrada : new Date(c.entrada),
+        saida: c.saida ? (c.saida instanceof Date ? c.saida : new Date(c.saida)) : null,
+        deadline: c.deadline ? (c.deadline instanceof Date ? c.deadline : new Date(c.deadline)) : null,
+        agendamento: c.agendamento ? (c.agendamento instanceof Date ? c.agendamento : new Date(c.agendamento)) : null,
       }));
       this._notify('containers');
-    });
-    this.listeners.push(unsub);
+    } catch (e) { console.error('Erro containers:', e); }
   },
 
-  _listenMovimentos() {
-    const unsub = db.collection('movimentos').orderBy('data', 'desc').onSnapshot(snap => {
-      this.movimentos = snap.docs.map(d => ({
-        id: d.id, ...d.data(),
-        data: d.data().data?.toDate?.() || new Date(d.data().data),
+  async refreshMovimentos() {
+    try {
+      this.movimentos = await FirestoreRest.getCollection('movimentos');
+      this.movimentos = this.movimentos.map(m => ({
+        ...m,
+        data: m.data instanceof Date ? m.data : new Date(m.data),
       }));
+      this.movimentos.sort((a, b) => (b.data || 0) - (a.data || 0));
       this._notify('movimentos');
-    });
-    this.listeners.push(unsub);
+    } catch (e) { console.error('Erro movimentos:', e); }
   },
 
-  _listenClientes() {
-    const unsub = db.collection('clientes').onSnapshot(snap => {
-      this.clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  async refreshClientes() {
+    try {
+      this.clientes = await FirestoreRest.getCollection('clientes');
       this._notify('clientes');
-    });
-    this.listeners.push(unsub);
+    } catch (e) { console.error('Erro clientes:', e); }
   },
 
-  _listenUsuarios() {
-    const unsub = db.collection('usuarios').onSnapshot(snap => {
-      this.usuarios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  async refreshUsuarios() {
+    try {
+      this.usuarios = await FirestoreRest.getCollection('usuarios');
       this._notify('usuarios');
-    });
-    this.listeners.push(unsub);
+    } catch (e) { console.error('Erro usuarios:', e); }
   },
 
-  _listeners: {},
   _notify(type) {
     (this._listeners[type] || []).forEach(fn => fn());
   },
@@ -74,53 +85,61 @@ const Store = {
     data.saida = data.saida?.toISOString?.() || null;
     data.deadline = data.deadline?.toISOString?.() || null;
     data.agendamento = data.agendamento?.toISOString?.() || null;
-    await db.collection('containers').doc(c.codigo || c.id).set(data);
+    await FirestoreRest.setDoc('containers', c.codigo || c.id, data);
+    await this.refreshContainers();
   },
 
   async deleteContainer(codigo) {
-    await db.collection('containers').doc(codigo).delete();
+    await FirestoreRest.deleteDoc('containers', codigo);
+    await this.refreshContainers();
   },
 
   async addMovement(m) {
     const data = { ...m };
     data.data = data.data?.toISOString?.() || data.data;
-    await db.collection('movimentos').add(data);
+    await FirestoreRest.addDoc('movimentos', data);
+    await this.refreshMovimentos();
   },
 
   async deleteMovement(id) {
-    await db.collection('movimentos').doc(id).delete();
+    await FirestoreRest.deleteDoc('movimentos', id);
+    await this.refreshMovimentos();
   },
 
   async clearHistory() {
-    const snap = await db.collection('movimentos').get();
-    const batch = db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
+    const movs = await FirestoreRest.getCollection('movimentos');
+    for (const m of movs) {
+      await FirestoreRest.deleteDoc('movimentos', m.id);
+    }
+    await this.refreshMovimentos();
   },
 
   async saveCliente(c) {
-    await db.collection('clientes').doc(c.codigo).set({ nome: c.nome, codigo: c.codigo });
+    await FirestoreRest.setDoc('clientes', c.codigo, { nome: c.nome, codigo: c.codigo });
+    await this.refreshClientes();
   },
 
   async deleteCliente(codigo) {
-    await db.collection('clientes').doc(codigo).delete();
+    await FirestoreRest.deleteDoc('clientes', codigo);
+    await this.refreshClientes();
   },
 
   async saveUser(u) {
-    await db.collection('usuarios').doc(u.nome).set({ nome: u.nome, senha: u.senha, perfil: u.perfil });
+    await FirestoreRest.setDoc('usuarios', u.nome, { nome: u.nome, senha: u.senha, perfil: u.perfil });
+    await this.refreshUsuarios();
   },
 
   async deleteUser(nome) {
-    await db.collection('usuarios').doc(nome).delete();
+    await FirestoreRest.deleteDoc('usuarios', nome);
+    await this.refreshUsuarios();
   },
 
   async clearAll() {
-    const cols = ['containers', 'movimentos'];
-    for (const col of cols) {
-      const snap = await db.collection(col).get();
-      const batch = db.batch();
-      snap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    }
-  }
+    const containers = await FirestoreRest.getCollection('containers');
+    for (const c of containers) await FirestoreRest.deleteDoc('containers', c.id);
+    const movs = await FirestoreRest.getCollection('movimentos');
+    for (const m of movs) await FirestoreRest.deleteDoc('movimentos', m.id);
+    await this.refreshContainers();
+    await this.refreshMovimentos();
+  },
 };
