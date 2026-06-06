@@ -6,7 +6,8 @@ async function fetchWithRetry(url, options, retries = 3) {
   for (let i = 0; i < retries; i++) {
     const resp = await fetch(url, options);
     if (resp.status === 429) {
-      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      const wait = 1000 * Math.pow(4, i);
+      await new Promise(r => setTimeout(r, wait));
       continue;
     }
     return resp;

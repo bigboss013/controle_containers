@@ -36,14 +36,14 @@ const Store = {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       localStorage.setItem('cache_' + collection, JSON.stringify(data));
       return data;
-    } catch (e) {
-      console.warn(`${collection} SDK failed, trying REST`);
+    } catch (sdkErr) {
+      console.warn(`${collection} SDK error: ${sdkErr.code} ${sdkErr.message}, trying REST`);
       try {
         const data = await FirestoreRest.getCollection(collection);
         localStorage.setItem('cache_' + collection, JSON.stringify(data));
         return data;
-      } catch (e2) {
-        console.warn(`${collection} REST also failed (${e2.message}), using cache`);
+      } catch (restErr) {
+        console.warn(`${collection} REST error: ${restErr.message}, using cache`);
         const c = localStorage.getItem('cache_' + collection);
         return c ? JSON.parse(c) : [];
       }
