@@ -23,7 +23,7 @@ class FirestoreDb {
       'senha': 'admin123', 'perfil': 'administrador',
     });
     await _db.collection('clientes').doc('ALFA-001').set({
-      'codigo': 'ALFA-001', 'nome': 'Alfa Logistica',
+      'codigo': 'ALFA-001', 'nome': 'Alfa Logística',
     });
     await _db.collection('clientes').doc('PORTO-109').set({
       'codigo': 'PORTO-109', 'nome': 'Porto Sul',
@@ -173,7 +173,7 @@ class ControleContainersApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Controle de Conteiners',
+      title: 'Controle de Contêineres',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -429,7 +429,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (usuario == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Usuario ou senha invalidos.')),
+        const SnackBar(content: Text('Usuário ou senha inválidos.')),
       );
       return;
     }
@@ -461,7 +461,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!existeUsuario) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Usuario nao encontrado.')),
+        const SnackBar(content: Text('Usuário não encontrado.')),
       );
       return;
     }
@@ -541,7 +541,7 @@ class _LoginPageState extends State<LoginPage> {
                             TextFormField(
                               controller: _nomeController,
                               decoration: const InputDecoration(
-                                labelText: 'Usuario',
+                                labelText: 'Usuário',
                                 prefixIcon: Icon(Icons.person_outline),
                                 border: OutlineInputBorder(),
                               ),
@@ -549,7 +549,7 @@ class _LoginPageState extends State<LoginPage> {
                               validator: (value) {
                                 return obrigatorio(
                                   value,
-                                  'Informe o usuario.',
+                                  'Informe o usuário.',
                                 );
                               },
                             ),
@@ -631,7 +631,7 @@ class _LoginPageState extends State<LoginPage> {
                                             _salvarCredenciais();
                                           }
                                         }),
-                                        child: const Text('Salvar usuario',
+                                        child: const Text('Salvar usuário',
                                             style: TextStyle(fontSize: 13)),
                                       ),
                                     ],
@@ -668,7 +668,7 @@ class _LoginPageState extends State<LoginPage> {
                                     return mensagem;
                                   }
                                   if (value != _senhaController.text) {
-                                    return 'As senhas nao conferem.';
+                                    return 'As senhas não conferem.';
                                   }
                                   return null;
                                 },
@@ -766,7 +766,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Usuario cadastrado com sucesso.')),
+      const SnackBar(content: Text('Usuário cadastrado com sucesso.')),
     );
   }
 
@@ -780,8 +780,8 @@ class _UsuariosPageState extends State<UsuariosPage> {
     final confirmou = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir usuario'),
-        content: Text('Deseja excluir o usuario "${usuario.nome}"?'),
+        title: const Text('Excluir usuário'),
+        content: Text('Deseja excluir o usuário "${usuario.nome}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -799,7 +799,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
     await widget.onExcluir(usuario.nome);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Usuario "${usuario.nome}" excluido.')),
+      SnackBar(content: Text('Usuário "${usuario.nome}" excluído.')),
     );
   }
 
@@ -809,7 +809,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          'Cadastrar novo usuario',
+          'Cadastrar novo usuário',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -822,17 +822,17 @@ class _UsuariosPageState extends State<UsuariosPage> {
               TextFormField(
                 controller: _nomeController,
                 decoration: const InputDecoration(
-                  labelText: 'Usuario',
+                  labelText: 'Usuário',
                   prefixIcon: Icon(Icons.person_outline),
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  final mensagem = obrigatorio(value, 'Informe o usuario.');
+                  final mensagem = obrigatorio(value, 'Informe o usuário.');
                   if (mensagem != null) {
                     return mensagem;
                   }
                   if (_nomeJaCadastrado(value!.trim())) {
-                    return 'Este usuario ja foi cadastrado.';
+                    return 'Este usuário já foi cadastrado.';
                   }
                   return null;
                 },
@@ -884,7 +884,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
                     return mensagem;
                   }
                   if (value != _senhaController.text) {
-                    return 'As senhas nao conferem.';
+                    return 'As senhas não conferem.';
                   }
                   return null;
                 },
@@ -921,7 +921,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
                 child: FilledButton.icon(
                   onPressed: _cadastrar,
                   icon: const Icon(Icons.person_add_alt_1),
-                  label: const Text('Cadastrar usuario'),
+                  label: const Text('Cadastrar usuário'),
                 ),
               ),
             ],
@@ -929,7 +929,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Usuarios cadastrados',
+          'Usuários cadastrados',
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -953,7 +953,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
               builder: (ctx) => AlertDialog(
                 title: const Text('Limpar dados'),
                 content: const Text(
-                    'Deseja excluir TODOS os containers e movimentos? Esta acao nao pode ser desfeita.'),
+                    'Deseja excluir TODOS os containers e movimentos? Esta ação não pode ser desfeita.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -1232,7 +1232,7 @@ class _HomePageState extends State<HomePage> {
     _clientes.addAll(await FirestoreDb.carregarClientes());
     if (_clientes.isEmpty) {
       _clientes.addAll([
-        Cliente(codigo: 'ALFA-001', nome: 'Alfa Logistica'),
+        Cliente(codigo: 'ALFA-001', nome: 'Alfa Logística'),
         Cliente(codigo: 'PORTO-109', nome: 'Porto Sul'),
       ]);
     }
@@ -1256,7 +1256,7 @@ class _HomePageState extends State<HomePage> {
         ContainerItem(
           codigo: 'MSCU1234567',
           codigoCliente: 'ALFA-001',
-          cliente: 'Alfa Logistica',
+          cliente: 'Alfa Logística',
           tipo: '40 HC',
           posicao: 'A-14',
           pesoKg: 24800,
@@ -1308,7 +1308,7 @@ class _HomePageState extends State<HomePage> {
     });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dados excluidos com sucesso.')),
+      const SnackBar(content: Text('Dados excluídos com sucesso.')),
     );
   }
 
@@ -1459,7 +1459,7 @@ class _HomePageState extends State<HomePage> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Editar posicao - ${item.codigo}'),
+        title: Text('Editar posição - ${item.codigo}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1468,7 +1468,7 @@ class _HomePageState extends State<HomePage> {
             TextField(
               controller: posController,
               decoration: const InputDecoration(
-                labelText: 'Nova posicao no patio',
+                labelText: 'Nova posição no pátio',
                 hintText: 'Ex: A-14 ou A5-34',
                 prefixIcon: Icon(Icons.place_outlined),
                 border: OutlineInputBorder(),
@@ -1489,7 +1489,7 @@ class _HomePageState extends State<HomePage> {
               item.posicao = novaPos;
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Posicao alterada para $novaPos.')),
+                SnackBar(content: Text('Posição alterada para $novaPos.')),
               );
             },
             child: const Text('Salvar'),
@@ -1527,7 +1527,7 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Container ${item.codigo} excluido.')),
+      SnackBar(content: Text('Contêiner ${item.codigo} excluído.')),
     );
   }
 
@@ -1538,7 +1538,7 @@ class _HomePageState extends State<HomePage> {
     _salvarDados();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Movimento excluido.')),
+      const SnackBar(content: Text('Movimento excluído.')),
     );
   }
 
@@ -1549,7 +1549,7 @@ class _HomePageState extends State<HomePage> {
     });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Historico limpo com sucesso.')),
+      const SnackBar(content: Text('Histórico limpo com sucesso.')),
     );
   }
 
@@ -1605,15 +1605,14 @@ class _HomePageState extends State<HomePage> {
         },
         perfil: widget.usuario.perfil,
       ),
-      if (isAdmin)
-        HistoricoPage(
-          movimentos: _movimentos,
-          containers: _containers,
-          onRegistrarNoShow: _registrarNoShow,
-          onReintegrar: _reintegrarNoShow,
-          onExcluirMovimento: _excluirMovimento,
-          onLimparHistorico: _limparHistorico,
-        ),
+      HistoricoPage(
+        movimentos: _movimentos,
+        containers: _containers,
+        onRegistrarNoShow: _registrarNoShow,
+        onReintegrar: _reintegrarNoShow,
+        onExcluirMovimento: isAdmin ? _excluirMovimento : null,
+        onLimparHistorico: isAdmin ? _limparHistorico : null,
+      ),
       if (isAdmin)
         UsuariosPage(
           usuarios: widget.usuarios,
@@ -1684,7 +1683,7 @@ class _HomePageState extends State<HomePage> {
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
-            label: 'Inicio',
+            label: 'Início',
           ),
           const NavigationDestination(
             icon: Icon(Icons.add_box_outlined),
@@ -1703,17 +1702,16 @@ class _HomePageState extends State<HomePage> {
             ),
             label: 'Deadline',
           ),
-          if (isAdmin)
-            const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long),
-              label: 'Historico',
-            ),
+          const NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Histórico',
+          ),
           if (isAdmin)
             const NavigationDestination(
               icon: Icon(Icons.manage_accounts_outlined),
               selectedIcon: Icon(Icons.manage_accounts),
-              label: 'Usuarios',
+              label: 'Usuários',
             ),
         ],
       ),
@@ -1882,7 +1880,7 @@ class _DashboardPageState extends State<DashboardPage> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Buscar container por codigo, cliente ou posicao...',
+              hintText: 'Buscar contêiner por código, cliente ou posição...',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -2101,7 +2099,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       TextField(
                         controller: codCliCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                          labelText: 'Código do cliente', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
@@ -2119,7 +2117,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       TextField(
                         controller: posCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Posicao', border: OutlineInputBorder(),
+                          labelText: 'Posição', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
@@ -2213,14 +2211,14 @@ class _DashboardPageState extends State<DashboardPage> {
                       TextField(
                         controller: obsCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Observacao', border: OutlineInputBorder(),
+                          labelText: 'Observação', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
                         minLines: 2, maxLines: 3,
                       ),
                       const SizedBox(height: 12),
-                      const Text('Historico de movimentacoes',
+                      const Text('Histórico de movimentações',
                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                       const SizedBox(height: 6),
                       ...widget.movimentos
@@ -2262,7 +2260,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           _confirmarSaida(context, container);
                         },
                         style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Saida'),
+                        child: const Text('Saída'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -2301,9 +2299,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar saida'),
+        title: const Text('Confirmar saída'),
         content: Text(
-            'Registrar saida do container ${container.codigo}?'),
+            'Registrar saída do container ${container.codigo}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -2704,7 +2702,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   },
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Horario do agendamento',
+                      labelText: 'Horário do agendamento',
                       prefixIcon: Icon(Icons.access_time),
                       border: OutlineInputBorder(),
                     ),
@@ -2909,7 +2907,7 @@ class ContainerCard extends StatelessWidget {
                             Padding(
                               padding: const EdgeInsets.only(left: 6),
                               child: Tooltip(
-                                message: 'Aguardando posicao',
+                                message: 'Aguardando posição',
                                 child: Icon(
                                   Icons.push_pin_outlined,
                                   size: 18,
@@ -2933,7 +2931,7 @@ class ContainerCard extends StatelessWidget {
               InfoLine(icon: Icons.business_outlined, texto: item.cliente),
               InfoLine(
                 icon: Icons.badge_outlined,
-                texto: 'Codigo cliente ${emptyLabel(item.codigoCliente)}',
+                texto: 'Código cliente ${emptyLabel(item.codigoCliente)}',
               ),
               InfoLine(
                 icon: Icons.scale_outlined,
@@ -2942,8 +2940,8 @@ class ContainerCard extends StatelessWidget {
               InfoLine(
                 icon: Icons.place_outlined,
                 texto: item.posicao.isEmpty
-                    ? 'Aguardando posicao'
-                    : 'Posicao ${positionLabel(item.posicao)}',
+                    ? 'Aguardando posição'
+                    : 'Posição ${positionLabel(item.posicao)}',
               ),
               if (item.observacao.trim().isNotEmpty)
                 InfoLine(
@@ -3017,11 +3015,11 @@ class ContainerCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Alterar posicao'),
+          title: const Text('Alterar posição'),
           content: TextField(
             controller: controller,
             decoration: const InputDecoration(
-              labelText: 'Nova posicao',
+              labelText: 'Nova posição',
               hintText: 'Ex: A-14 ou A5-34',
             ),
             textCapitalization: TextCapitalization.characters,
@@ -3105,15 +3103,15 @@ class ContainerCard extends StatelessWidget {
               InfoLine(icon: Icons.business_outlined, texto: item.cliente),
               InfoLine(
                   icon: Icons.badge_outlined,
-                  texto: 'Codigo cliente ${emptyLabel(item.codigoCliente)}'),
+                  texto: 'Código cliente ${emptyLabel(item.codigoCliente)}'),
               InfoLine(
                   icon: Icons.scale_outlined,
                   texto: 'Peso ${weightLabel(item.pesoKg)}'),
               InfoLine(
                   icon: Icons.place_outlined,
                   texto: item.posicao.isEmpty
-                      ? 'Aguardando posicao'
-                      : 'Posicao ${positionLabel(item.posicao)}'),
+                      ? 'Aguardando posição'
+                      : 'Posição ${positionLabel(item.posicao)}'),
               if (item.observacao.trim().isNotEmpty)
                 InfoLine(
                     icon: Icons.report_problem_outlined,
@@ -3139,7 +3137,7 @@ class ContainerCard extends StatelessWidget {
               if (item.saida != null)
                 InfoLine(
                     icon: Icons.logout,
-                    texto: 'Saida em ${formatDate(item.saida!)}'),
+                    texto: 'Saída em ${formatDate(item.saida!)}'),
               if (item.noShowCount > 0)
                 InfoLine(
                     icon: Icons.cancel_outlined,
@@ -3252,7 +3250,7 @@ class ContainerCard extends StatelessWidget {
                         onSaida();
                       },
                       icon: const Icon(Icons.logout, size: 18),
-                      label: const Text('Saida', style: TextStyle(fontSize: 13)),
+                      label: const Text('Saída', style: TextStyle(fontSize: 13)),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF64748B),
                       ),
@@ -3317,7 +3315,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Atualizacao disponivel'),
+      title: const Text('Atualização disponível'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -3325,18 +3323,18 @@ class _DownloadDialogState extends State<DownloadDialog> {
           const SizedBox(height: 12),
           if (_erro)
             const Text(
-              'Nao foi possivel abrir o navegador.\n'
+              'Não foi possível abrir o navegador.\n'
               'Acesse manualmente o link abaixo:\n',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.red, fontSize: 13),
             ),
           if (!_iniciado && !_erro) ...[
-            const Text('Nova versao disponivel para download.',
+            const Text('Nova versão disponível para download.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             const Text(
-              'O download sera feito pelo navegador.\n'
-              'Apos baixar, toque em "Instalar".\n'
+              'O download será feito pelo navegador.\n'
+              'Após baixar, toque em "Instalar".\n'
               'Se o Play Protect perguntar, toque em "Instalar mesmo assim".\n'
               'Se o Play Protect bloquear, abra o gerenciador de arquivos,\n'
               'va em Downloads e instale manualmente o APK.',
@@ -3349,7 +3347,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             const Text(
-              'Apos o download, toque em "Instalar".\n'
+              'Após o download, toque em "Instalar".\n'
               'Se o Play Protect bloquear, abra o app Arquivos,\n'
               'va em Downloads e toque no APK baixado.',
               textAlign: TextAlign.center,
@@ -3808,7 +3806,7 @@ class _EntradaPageState extends State<EntradaPage> {
             TextField(
               controller: codCtrl,
               decoration: const InputDecoration(
-                labelText: 'Codigo do cliente',
+                labelText: 'Código do cliente',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -3852,10 +3850,7 @@ class _EntradaPageState extends State<EntradaPage> {
       source: ImageSource.camera,
       imageQuality: 85,
     );
-    if (foto == null) {
-      return;
-    }
-
+    if (foto == null || !mounted) return;
     setState(() => _fotoAvariaPath = foto.path);
   }
 
@@ -3864,13 +3859,14 @@ class _EntradaPageState extends State<EntradaPage> {
       source: ImageSource.camera,
       imageQuality: 80,
     );
-    if (foto == null) return;
+    if (foto == null || !mounted) return;
     setState(() => _isScanning = true);
     try {
       final inputImage = InputImage.fromFilePath(foto.path);
       final recognizer = TextRecognizer();
       final recognisedText = await recognizer.processImage(inputImage);
       await recognizer.close();
+      if (!mounted) return;
       final codigoRegex = RegExp(r'[A-Z]{4}\d{7}');
       for (final block in recognisedText.blocks) {
         for (final line in block.lines) {
@@ -3883,23 +3879,24 @@ class _EntradaPageState extends State<EntradaPage> {
         }
       }
       if (mounted) {
+        setState(() => _isScanning = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Codigo do container nao encontrado na imagem.')),
+              content: Text('Código do contêiner não encontrado na imagem.')),
         );
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isScanning = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao ler imagem: $e')),
         );
       }
     }
-    if (mounted) setState(() => _isScanning = false);
   }
 
   void _salvar() {
-    if (!_formKey.currentState!.validate()) {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
 
@@ -3968,7 +3965,7 @@ class _EntradaPageState extends State<EntradaPage> {
       if (file.bytes == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nao foi possivel ler o arquivo.')),
+          const SnackBar(content: Text('Não foi possível ler o arquivo.')),
         );
         return;
       }
@@ -3976,7 +3973,7 @@ class _EntradaPageState extends State<EntradaPage> {
       if (excel.tables.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Planilha vazia ou invalida.')),
+          const SnackBar(content: Text('Planilha vazia ou inválida.')),
         );
         return;
       }
@@ -4035,7 +4032,7 @@ class _EntradaPageState extends State<EntradaPage> {
       if (items.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhum container valido encontrado na planilha.')),
+          const SnackBar(content: Text('Nenhum contêiner válido encontrado na planilha.')),
         );
         return;
       }
@@ -4084,7 +4081,7 @@ class _EntradaPageState extends State<EntradaPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Importe um arquivo .xlsx. Se o container tiver peso, sera registrado como CHEIO. Se nao tiver, como VAZIO.',
+          'Importe um arquivo .xlsx. Se o container tiver peso, será registrado como CHEIO. Se não tiver, como VAZIO.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 16),
@@ -4096,7 +4093,7 @@ class _EntradaPageState extends State<EntradaPage> {
                 controller: _codigoController,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
-                  labelText: 'Codigo do conteiner',
+                  labelText: 'Código do contêiner',
                   hintText: 'Ex: MSCU1234567',
                   prefixIcon: const Icon(Icons.tag),
                   suffixIcon: _isScanning
@@ -4109,14 +4106,14 @@ class _EntradaPageState extends State<EntradaPage> {
                         )
                       : IconButton(
                           icon: const Icon(Icons.camera_alt_outlined),
-                          tooltip: 'Escanear codigo',
+                          tooltip: 'Escanear código',
                           onPressed: _scanContainerCode,
                         ),
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
-                validator: (value) => obrigatorio(value, 'Informe o codigo.'),
+                validator: (value) => obrigatorio(value, 'Informe o código.'),
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -4124,7 +4121,7 @@ class _EntradaPageState extends State<EntradaPage> {
                 readOnly: true,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
-                  labelText: 'Codigo do cliente',
+                labelText: 'Código do cliente',
                   hintText: 'Toque para selecionar',
                   prefixIcon: const Icon(Icons.badge_outlined),
                   suffixIcon: const Icon(Icons.arrow_drop_down),
@@ -4133,7 +4130,7 @@ class _EntradaPageState extends State<EntradaPage> {
                 ),
                 onTap: _selecionarCliente,
                 validator: (value) =>
-                    obrigatorio(value, 'Informe o codigo do cliente.'),
+                    obrigatorio(value, 'Informe o código do cliente.'),
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -4175,7 +4172,7 @@ class _EntradaPageState extends State<EntradaPage> {
                   controller: _pesoController,
                   style: const TextStyle(fontSize: 18),
                   decoration: const InputDecoration(
-                    labelText: 'Peso do conteiner',
+                    labelText: 'Peso do contêiner',
                     hintText: 'Ex: 24500',
                     suffixText: 'kg',
                     prefixIcon: Icon(Icons.scale_outlined),
@@ -4191,7 +4188,7 @@ class _EntradaPageState extends State<EntradaPage> {
                       return mensagem;
                     }
                     if (parseWeight(value!) == null) {
-                      return 'Informe um peso valido.';
+                      return 'Informe um peso válido.';
                     }
                     return null;
                   },
@@ -4220,8 +4217,8 @@ class _EntradaPageState extends State<EntradaPage> {
                 controller: _observacaoController,
                 style: const TextStyle(fontSize: 18),
                 decoration: const InputDecoration(
-                  labelText: 'Observacao',
-                  hintText: 'Descreva avarias, lacre, divergencias...',
+                  labelText: 'Observação',
+                  hintText: 'Descreva avarias, lacre, divergências...',
                   prefixIcon: Icon(Icons.report_problem_outlined),
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
@@ -4258,7 +4255,7 @@ class _EntradaPageState extends State<EntradaPage> {
                   controller: _posicaoController,
                   style: const TextStyle(fontSize: 18),
                   decoration: const InputDecoration(
-                    labelText: 'Posicao no patio',
+                    labelText: 'Posição no pátio',
                     hintText: 'Ex: A-14 ou A5-34',
                     prefixIcon: Icon(Icons.place_outlined),
                     border: OutlineInputBorder(),
@@ -4266,13 +4263,13 @@ class _EntradaPageState extends State<EntradaPage> {
                   ),
                   textCapitalization: TextCapitalization.characters,
                   validator: (value) =>
-                      obrigatorio(value, 'Informe a posicao.'),
+                      obrigatorio(value, 'Informe a posição.'),
                 ),
               ] else ...[
                 const SizedBox(height: 14),
                 const PermissionNotice(
                   texto:
-                      'Perfil Gate registra a entrada sem posicao. A posicao sera definida pelo Conferente.',
+                      'Perfil Gate registra a entrada sem posição. A posição será definida pelo Conferente.',
                 ),
               ],
               if (_podeInformarPosicao) ...[
@@ -4342,7 +4339,7 @@ class HistoricoPage extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Historico',
+                'Histórico',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -4355,8 +4352,8 @@ class HistoricoPage extends StatelessWidget {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Limpar historico'),
-                      content: const Text('Deseja excluir todo o historico? Esta acao nao pode ser desfeita.'),
+                      title: const Text('Limpar histórico'),
+                      content: const Text('Deseja excluir todo o histórico? Esta ação não pode ser desfeita.'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
@@ -4483,7 +4480,7 @@ class HistoricoPage extends StatelessWidget {
             Text(formatDate(movimento.data), style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (container != null && isSaida) ...[
               const SizedBox(height: 12),
-              const Text('Acoes disponiveis:', style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text('Ações disponíveis:', style: TextStyle(fontWeight: FontWeight.w600)),
             ],
           ],
         ),
@@ -4531,7 +4528,7 @@ class HistoricoPage extends StatelessWidget {
             TextField(
               controller: posController,
               decoration: const InputDecoration(
-                labelText: 'Nova posicao no patio',
+                labelText: 'Nova posição no pátio',
                 hintText: 'Ex: A-14 ou A5-34',
                 prefixIcon: Icon(Icons.place_outlined),
                 border: OutlineInputBorder(),
@@ -4671,7 +4668,7 @@ class DeadlinePage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Containeres com prazo limite para entrada no terminal.',
+          'Contêineres com prazo limite para entrada no terminal.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 12),
@@ -4688,7 +4685,7 @@ class DeadlinePage extends StatelessWidget {
             final label = diff <= 1
                 ? 'URGENTE - ${diff}d'
                 : diff <= 3
-                    ? 'Atencao - ${diff}d'
+                    ? 'Atenção - ${diff}d'
                     : '${diff}d restantes';
 
             return Card(
@@ -4742,8 +4739,8 @@ class DeadlinePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InfoLine(icon: Icons.business_outlined, texto: c.cliente),
-              InfoLine(icon: Icons.badge_outlined, texto: 'Codigo cliente ${emptyLabel(c.codigoCliente)}'),
-              InfoLine(icon: Icons.place_outlined, texto: c.posicao.isEmpty ? 'Aguardando posicao' : 'Posicao ${positionLabel(c.posicao)}'),
+              InfoLine(icon: Icons.badge_outlined, texto: 'Código cliente ${emptyLabel(c.codigoCliente)}'),
+              InfoLine(icon: Icons.place_outlined, texto: c.posicao.isEmpty ? 'Aguardando posição' : 'Posição ${positionLabel(c.posicao)}'),
               InfoLine(icon: Icons.scale_outlined, texto: 'Peso ${weightLabel(c.pesoKg)}'),
               if (c.terminal != null) InfoLine(icon: Icons.business, texto: 'Terminal: ${c.terminal}'),
               if (c.navio != null) InfoLine(icon: Icons.directions_boat, texto: 'Navio: ${c.navio}'),
@@ -4810,7 +4807,7 @@ class DeadlinePage extends StatelessWidget {
                       TextField(
                         controller: codCliCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Codigo do cliente', border: OutlineInputBorder(),
+                          labelText: 'Código do cliente', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
@@ -4828,7 +4825,7 @@ class DeadlinePage extends StatelessWidget {
                       TextField(
                         controller: posCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Posicao', border: OutlineInputBorder(),
+                          labelText: 'Posição', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
@@ -4922,7 +4919,7 @@ class DeadlinePage extends StatelessWidget {
                       TextField(
                         controller: obsCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Observacao', border: OutlineInputBorder(),
+                          labelText: 'Observação', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 14),
@@ -5029,21 +5026,21 @@ String? obrigatorio(String? value, String mensagem) {
 
 String positionLabel(String posicao) {
   if (posicao.trim().isEmpty) {
-    return 'Aguardando posicao';
+    return 'Aguardando posição';
   }
   return posicao;
 }
 
 String emptyLabel(String value) {
   if (value.trim().isEmpty) {
-    return 'Nao informado';
+    return 'Não informado';
   }
   return value;
 }
 
 String weightLabel(double? value) {
   if (value == null) {
-    return 'Nao informado';
+    return 'Não informado';
   }
   final formatted = value % 1 == 0
       ? value.toStringAsFixed(0)
