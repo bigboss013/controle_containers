@@ -28,8 +28,7 @@ const Store = {
     for (const col of ['containers','movimentos','clientes','usuarios']) {
       const c = localStorage.getItem('cache_' + col);
       if (c) {
-        try { this[col] = this._parseDates(JSON.parse(c), col); }
-        catch {}
+        try { this[col] = this._parseDates(JSON.parse(c), col); } catch {}
       }
     }
   },
@@ -64,96 +63,133 @@ const Store = {
   },
 
   async _fetch(collection) {
-    const col = collection;
     for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
       try {
-        const data = await FirestoreRest.getCollection(col);
-        this._saveCache(col, data);
-        this[col] = this._parseDates(data, col);
-        if (col === 'movimentos') {
-          this[col].sort((a, b) => (b.data || 0) - (a.data || 0));
+        const snap = await db.collection(collection).get();
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        this._saveCache(collection, data);
+        this[collection] = this._parseDates(data, collection);
+        if (collection === 'movimentos') {
+          this[collection].sort((a, b) => (b.data || 0) - (a.data || 0));
         }
-        this._notify(col);
-        this._retries[col] = 0;
+        this._notify(collection);
+        this._retries[collection] = 0;
         return;
-      } catch (err) {
-        const is429 = err.message.includes('429') || err.message.includes('Servidor ocupado');
-        if (!is429 || attempt >= RETRY_DELAYS.length - 1) {
-          console.warn(`${col} falhou: ${err.message}`);
-          this._retries[col] = (this._retries[col] || 0) + 1;
-          this._notify(col);
+      } catch (sdkErr) {
+        console.warn(`${collection} SDK: ${sdkErr.code} ${sdkErr.message}`);
+        try {
+          const data = await FirestoreRest.getCollection(collection);
+          this._saveCache(collection, data);
+          this[collection] = this._parseDates(data, collection);
+          if (collection === 'movimentos') {
+            this[collection].sort((a, b) => (b.data || 0) - (a.data || 0));
+          }
+          this._notify(collection);
+          this._retries[collection] = 0;
           return;
+        } catch (restErr) {
+          const is429 = restErr.message.includes('429') || restErr.message.includes('Servidor ocupado');
+          if (!is429 || attempt >= RETRY_DELAYS.length - 1) {
+            console.warn(`${collection}: SDK+falha + REST falhou`);
+            this._retries[collection] = (this._retries[collection] || 0) + 1;
+            this._notify(collection);
+            return;
+          }
+          await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt] * 1000));
         }
-        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt] * 1000));
       }
-    }
-  },
-
-  async _fetchOne(collection, id) {
-    try {
-      return await FirestoreRest.getDoc(collection, id);
-    } catch {
-      const c = localStorage.getItem('cache_' + collection);
-      if (c) {
-        const data = JSON.parse(c);
-        return data.find(d => d.id === id || d.codigo === id) || null;
-      }
-      return null;
     }
   },
 
   async saveContainer(c) {
     const id = c.codigo || c.id;
-    const data = { ...c, id: undefined };
     for (const k of ['entrada','saida','deadline','agendamento']) {
-      if (data[k] instanceof Date) data[k] = data[k].toISOString();
+      if (c[k] instanceof Date) c[k] = c[k].toISOString();
     }
-    await FirestoreRest.setDoc('containers', id, data);
+    try {
+      await db.collection('containers').doc(id).set(c);
+    } catch {
+      await FirestoreRest.setDoc('containers', id, c);
+    }
     await this._fetch('containers');
   },
 
   async deleteContainer(codigo) {
-    await FirestoreRest.deleteDoc('containers', codigo);
+    try {
+      await db.collection('containers').doc(codigo).delete();
+    } catch {
+      await FirestoreRest.deleteDoc('containers', codigo);
+    }
     await this._fetch('containers');
   },
 
   async addMovement(m) {
-    const data = { ...m };
-    if (data.data instanceof Date) data.data = data.data.toISOString();
-    await FirestoreRest.addDoc('movimentos', data);
+    if (m.data instanceof Date) m.data = m.data.toISOString();
+    try {
+      await db.collection('movimentos').add(m);
+    } catch {
+      await FirestoreRest.addDoc('movimentos', m);
+    }
     await this._fetch('movimentos');
   },
 
   async deleteMovement(id) {
-    await FirestoreRest.deleteDoc('movimentos', id);
+    try {
+      await db.collection('movimentos').doc(id).delete();
+    } catch {
+      await FirestoreRest.deleteDoc('movimentos', id);
+    }
     await this._fetch('movimentos');
   },
 
   async clearHistory() {
-    const list = await FirestoreRest.getCollection('movimentos');
-    for (const m of list) {
-      await FirestoreRest.deleteDoc('movimentos', m.id);
+    try {
+      const snap = await db.collection('movimentos').get();
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    } catch {
+      const list = await FirestoreRest.getCollection('movimentos');
+      for (const m of list) {
+        await FirestoreRest.deleteDoc('movimentos', m.id);
+      }
     }
     await this._fetch('movimentos');
   },
 
   async saveCliente(c) {
-    await FirestoreRest.setDoc('clientes', c.codigo, { nome: c.nome, codigo: c.codigo });
+    try {
+      await db.collection('clientes').doc(c.codigo).set({ nome: c.nome, codigo: c.codigo });
+    } catch {
+      await FirestoreRest.setDoc('clientes', c.codigo, { nome: c.nome, codigo: c.codigo });
+    }
     await this._fetch('clientes');
   },
 
   async deleteCliente(codigo) {
-    await FirestoreRest.deleteDoc('clientes', codigo);
+    try {
+      await db.collection('clientes').doc(codigo).delete();
+    } catch {
+      await FirestoreRest.deleteDoc('clientes', codigo);
+    }
     await this._fetch('clientes');
   },
 
   async saveUser(u) {
-    await FirestoreRest.setDoc('usuarios', u.nome, { nome: u.nome, senha: u.senha, perfil: u.perfil });
+    try {
+      await db.collection('usuarios').doc(u.nome).set({ nome: u.nome, senha: u.senha, perfil: u.perfil });
+    } catch {
+      await FirestoreRest.setDoc('usuarios', u.nome, { nome: u.nome, senha: u.senha, perfil: u.perfil });
+    }
     await this._fetch('usuarios');
   },
 
   async deleteUser(nome) {
-    await FirestoreRest.deleteDoc('usuarios', nome);
+    try {
+      await db.collection('usuarios').doc(nome).delete();
+    } catch {
+      await FirestoreRest.deleteDoc('usuarios', nome);
+    }
     await this._fetch('usuarios');
   },
 
