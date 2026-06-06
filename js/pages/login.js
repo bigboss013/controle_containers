@@ -11,11 +11,12 @@ function renderLogin() {
             <label>Usuário</label>
             <input id="login-user" value="${saved?.nome || ''}" required autocomplete="username">
           </div>
-          <div class="form-group">
-            <label>Senha</label>
-            <input id="login-pass" type="password" required autocomplete="current-password">
-          </div>
-          <button type="submit" class="btn btn-primary btn-full">Entrar</button>
+  <div class="form-group">
+    <label>Senha</label>
+    <input id="login-pass" type="password" required autocomplete="current-password">
+  </div>
+  <button type="submit" class="btn btn-primary btn-full">Entrar</button>
+  <button type="button" class="btn btn-outline btn-full" style="margin-top:8px" onclick="testConnection()">🔍 Testar conexão</button>
         </form>
         <div style="text-align:center;margin-top:12px">
           <a href="#" onclick="showResetPassword()" style="color:var(--primary);font-size:.85rem">Esqueceu a senha?</a>
@@ -89,4 +90,32 @@ async function doResetPassword(e) {
   const ok = await Auth.resetPassword(user, pass);
   Utils.closeModal();
   Utils.showToast(ok ? 'Senha redefinida!' : 'Usuário não encontrado');
+}
+
+async function testConnection() {
+  const errEl = document.getElementById('login-error');
+  errEl.innerHTML = 'Testando...';
+  
+  try {
+    const testDoc = await db.collection('usuarios').doc('admin').get();
+    if (testDoc.exists) {
+      const data = testDoc.data();
+      errEl.innerHTML = `✅ SDK OK - admin: ${JSON.stringify(data)}<br><small>Se login falhar, verifique a senha.</small>`;
+      return;
+    }
+    errEl.innerHTML = '⚠️ SDK conectou mas admin não existe';
+  } catch (e) {
+    console.warn('SDK error:', e);
+    try {
+      const resp = await fetch('https://firestore.googleapis.com/v1/projects/santos-transportes/databases/(default)/documents/usuarios/admin?key=AIzaSyCje8V9yQcgJ6LJL1AhyViKq8ArtjARsRA');
+      if (resp.ok) {
+        const doc = await resp.json();
+        errEl.innerHTML = `✅ REST OK - admin: ${doc.fields?.senha?.stringValue}<br><small>SDK falhou mas REST funciona.</small>`;
+        return;
+      }
+      errEl.innerHTML = `❌ REST: ${resp.status} - ${resp.statusText}<br><small>Rate limit ativo. Aguarde.</small>`;
+    } catch (e2) {
+      errEl.innerHTML = `❌ Rede: ${e2.message}`;
+    }
+  }
 }
