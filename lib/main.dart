@@ -2348,41 +2348,24 @@ class _DashboardPageState extends State<DashboardPage> {
         .where((c) =>
             c.status != ContainerStatus.saiu && c.posicao.isNotEmpty)
         .toList();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text('Mapa 3D - Patio',
-                        style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: YardMap3D(
-                containers: yard,
-                onContainerTap: (c) {
-                  Navigator.pop(ctx);
-                  _abrirDetalhesContainer(context, c);
-                },
-              ),
-            ),
-          ],
+    Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapaVirtualPage(
+          containers: yard,
+          onContainerTap: (c) {
+            Navigator.pop(context);
+            _abrirDetalhesContainer(context, c);
+          },
         ),
       ),
-    );
+    ).then((posicao) {
+      if (posicao != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Posicao $posicao - use Entrada para adicionar')),
+        );
+      }
+    });
   }
 
   Widget _buildEmbarqueSection() {
@@ -3511,6 +3494,529 @@ class YardMap3D extends StatelessWidget {
                 );
               }).toList(),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MapaVirtualPage extends StatefulWidget {
+  const MapaVirtualPage({
+    super.key,
+    required this.containers,
+    this.highlightCodigo,
+    this.onContainerTap,
+  });
+
+  final List<ContainerItem> containers;
+  final String? highlightCodigo;
+  final void Function(ContainerItem container)? onContainerTap;
+
+  @override
+  State<MapaVirtualPage> createState() => _MapaVirtualPageState();
+}
+
+class _MapaVirtualPageState extends State<MapaVirtualPage> {
+  String _blocoFiltro = 'Todos';
+  final TransformationController _transformationController =
+      TransformationController();
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  List<ContainerItem> get _yard => widget.containers
+      .where(
+          (c) => c.status != ContainerStatus.saiu && c.posicao.isNotEmpty)
+      .toList();
+
+  List<String> get _blocos {
+    final blocos = <String>{};
+    for (final c in _yard) {
+      final (block, _) = parsePosition(c.posicao);
+      blocos.add(block);
+    }
+    final sorted = blocos.toList()..sort();
+    return ['Todos', ...sorted];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final filtered = _blocoFiltro == 'Todos'
+        ? _yard
+        : _yard.where((c) {
+            final (block, _) = parsePosition(c.posicao);
+            return block == _blocoFiltro;
+          }).toList();
+
+    if (filtered.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mapa do Patio')),
+        body: const Center(
+          child: Text('Nenhum container no patio.',
+              style: TextStyle(fontSize: 16, color: Colors.grey)),
+        ),
+      );
+    }
+
+    final layout = <String, Map<int?, Map<int, Map<int, ContainerItem>>>>{};
+    for (final c in filtered) {
+      final (block, row) = parsePosition(c.posicao);
+      final pos = c.posicao.replaceAll('.', '-');
+      final parts = pos.split('-');
+      final sh = parts.length >= 2 ? parts[1] : '';
+      final stack = sh.isNotEmpty ? int.tryParse(sh[0]) ?? 1 : 1;
+      final height = sh.length >= 2 ? int.tryParse(sh[1]) ?? 1 : 1;
+      layout.putIfAbsent(block, () => {});
+      layout[block]!.putIfAbsent(row, () => {});
+      layout[block]![row]!.putIfAbsent(stack, () => {});
+      layout[block]![row]![stack]![height] = c;
+    }
+
+    final sortedBlocks = layout.keys.toList()..sort();
+    final screenW = MediaQuery.of(context).size.width;
+    final cellW = screenW < 400 ? 72.0 : screenW < 600 ? 84.0 : 96.0;
+    final cellH = cellW * 0.55;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mapa do Patio'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.restart_alt),
+            tooltip: 'Resetar zoom',
+            onPressed: () {
+              _transformationController.value = Matrix4.identity();
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              scrollDirection: Axis.horizontal,
+              itemCount: _blocos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final b = _blocos[i];
+                final selected = _blocoFiltro == b;
+                return ChoiceChip(
+                  label: Text(b == 'Todos' ? 'Todos' : 'Quadra $b'),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _blocoFiltro = b),
+                  selectedColor: colorScheme.primaryContainer,
+                  labelStyle: TextStyle(
+                    color: selected ? colorScheme.primary : Colors.black87,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: InteractiveViewer(
+              transformationController: _transformationController,
+              minScale: 0.5,
+              maxScale: 4.0,
+              boundaryMargin: const EdgeInsets.all(50),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: sortedBlocks.map((block) {
+                    final rows = layout[block]!;
+                    final sortedRows = rows.keys.toList()
+                      ..sort((a, b) {
+                        if (a == null && b == null) return 0;
+                        if (a == null) return -1;
+                        if (b == null) return 1;
+                        return a.compareTo(b);
+                      });
+
+                    int maxStack = 0;
+                    int maxHeight = 0;
+                    for (final row in sortedRows) {
+                      for (final s in rows[row]!.keys) {
+                        if (s > maxStack) maxStack = s;
+                        for (final h in rows[row]![s]!.keys) {
+                          if (h > maxHeight) maxHeight = h;
+                        }
+                      }
+                    }
+                    maxStack = maxStack.clamp(1, 12);
+                    maxHeight = maxHeight.clamp(1, 9);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Quadra $block',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          ...sortedRows.map((row) {
+                            final stacks = rows[row]!;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (row != null)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 4),
+                                      child: Text('Linha $row',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black54)),
+                                    ),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: List.generate(
+                                          maxHeight,
+                                          (i) => SizedBox(
+                                            width: 24,
+                                            height: cellH,
+                                            child: Center(
+                                              child: Text('${maxHeight - i}',
+                                                  style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey)),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      ...List.generate(maxStack, (si) {
+                                        final stackNum = si + 1;
+                                        final containersInStack =
+                                            stacks[stackNum] ?? {};
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 3),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.end,
+                                            children: List.generate(
+                                              maxHeight, (hi) {
+                                              final heightNum =
+                                                  maxHeight - hi;
+                                              final c = containersInStack[
+                                                  heightNum];
+                                              final isEmpty = c == null;
+                                              final isHighlighted =
+                                                  c?.codigo ==
+                                                      widget
+                                                          .highlightCodigo;
+
+                                              Color bgColor;
+                                              Color borderColor;
+                                              if (isEmpty) {
+                                                bgColor =
+                                                    Colors.grey.shade50;
+                                                borderColor =
+                                                    Colors.grey.shade200;
+                                              } else if (isHighlighted) {
+                                                bgColor = const Color(
+                                                    0xFF22C55E);
+                                                borderColor = const Color(
+                                                    0xFF16A34A);
+                                              } else {
+                                                switch (c!.status) {
+                                                  case ContainerStatus
+                                                        .embarcado:
+                                                    bgColor =
+                                                        const Color(
+                                                            0xFF22C55E)
+                                                            .withValues(
+                                                                alpha:
+                                                                    0.5);
+                                                    borderColor =
+                                                        const Color(
+                                                            0xFF16A34A);
+                                                    break;
+                                                  case ContainerStatus
+                                                        .noShow:
+                                                    bgColor =
+                                                        const Color(
+                                                            0xFFEF4444)
+                                                            .withValues(
+                                                                alpha:
+                                                                    0.5);
+                                                    borderColor =
+                                                        const Color(
+                                                            0xFFDC2626);
+                                                    break;
+                                                  case ContainerStatus
+                                                        .reserva:
+                                                    bgColor =
+                                                        const Color(
+                                                            0xFFFBBF24)
+                                                            .withValues(
+                                                                alpha:
+                                                                    0.5);
+                                                    borderColor =
+                                                        const Color(
+                                                            0xFFF59E0B);
+                                                    break;
+                                                  default:
+                                                    bgColor = Color.lerp(
+                                                        colorScheme
+                                                            .primaryContainer,
+                                                        colorScheme
+                                                            .primary,
+                                                        (heightNum - 1) /
+                                                            maxHeight
+                                                                .toDouble())!;
+                                                    borderColor =
+                                                        colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                                alpha:
+                                                                    0.3);
+                                                }
+                                              }
+
+                                              return GestureDetector(
+                                                onTap: isEmpty
+                                                    ? () =>
+                                                        _onCelulaVaziaTap(
+                                                            block,
+                                                            row,
+                                                            stackNum,
+                                                            heightNum)
+                                                    : () => widget
+                                                        .onContainerTap
+                                                        ?.call(c!),
+                                                onLongPress: c != null
+                                                    ? () =>
+                                                        _mostrarTooltip(
+                                                            context, c!)
+                                                    : null,
+                                                child: Tooltip(
+                                                  message: c != null
+                                                      ? '${c.codigo}\n${c.posicao}\n${c.cliente}'
+                                                      : '$block${row ?? ''}-$stackNum$heightNum (vazio)',
+                                                  child: Container(
+                                                    width: cellW,
+                                                    height: cellH,
+                                                    margin:
+                                                        const EdgeInsets
+                                                            .only(
+                                                            bottom: 2),
+                                                    decoration:
+                                                        BoxDecoration(
+                                                      color: bgColor,
+                                                      borderRadius:
+                                                          BorderRadius
+                                                              .circular(
+                                                                  3),
+                                                      border:
+                                                          Border.all(
+                                                        color:
+                                                            borderColor,
+                                                        width:
+                                                            isHighlighted
+                                                                ? 2.5
+                                                                : 1,
+                                                      ),
+                                                      boxShadow: isEmpty
+                                                          ? null
+                                                          : [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.08),
+                                                                offset:
+                                                                    const Offset(0,
+                                                                        2),
+                                                                blurRadius:
+                                                                    4,
+                                                              ),
+                                                            ],
+                                                    ),
+                                                    child: Center(
+                                                      child: Text(
+                                                        isEmpty
+                                                            ? '-'
+                                                            : '${c!.codigo.substring(c.codigo.length > 4 ? c.codigo.length - 4 : 0)}',
+                                                        style: TextStyle(
+                                                          fontSize: isEmpty
+                                                              ? 10
+                                                              : 11,
+                                                          fontWeight: isEmpty
+                                                              ? null
+                                                              : FontWeight
+                                                                  .w700,
+                                                          color: isEmpty
+                                                              ? Colors
+                                                                  .grey
+                                                                  .shade400
+                                                              : isHighlighted
+                                                                  ? Colors
+                                                                      .white
+                                                                  : Colors
+                                                                      .black87,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 24),
+                                      ...List.generate(maxStack, (i) {
+                                        final sn = i + 1;
+                                        return SizedBox(
+                                          width: cellW + 3,
+                                          child: Text('P$sn',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey)),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                  top: BorderSide(color: Colors.grey.shade200, width: 1)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _legendaItem(Colors.grey.shade200, 'Vazio'),
+                _legendaItem(
+                    colorScheme.primaryContainer, 'Armazenado'),
+                _legendaItem(const Color(0xFFFBBF24), 'Reserva'),
+                _legendaItem(const Color(0xFF22C55E), 'Embarcado'),
+                _legendaItem(const Color(0xFFEF4444), 'No-Show'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendaItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: Colors.grey.shade400, width: 0.5),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11)),
+      ],
+    );
+  }
+
+  void _onCelulaVaziaTap(String block, int? row, int stack, int height) {
+    final posicao = '$block${row != null ? '$row' : ''}-$stack$height';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Posição vazia'),
+        content: Text('Deseja adicionar um container na posição $posicao?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context, posicao);
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarTooltip(BuildContext context, ContainerItem c) {
+    final statusText = {
+      ContainerStatus.armazenado: 'Armazenado',
+      ContainerStatus.reserva: 'Reserva',
+      ContainerStatus.embarcado: 'Embarcado',
+      ContainerStatus.noShow: 'No-Show',
+      ContainerStatus.saiu: 'Saiu',
+    };
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(c.codigo),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Posicao: ${c.posicao}'),
+            Text('Cliente: ${c.cliente}'),
+            Text('Tipo: ${c.tipo}'),
+            Text('Status: ${statusText[c.status] ?? c.status.name}'),
+            Text(
+                'Entrada: ${c.entrada.day}/${c.entrada.month}/${c.entrada.year}'),
+            if (c.pesoKg != null) Text('Peso: ${c.pesoKg} kg'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onContainerTap?.call(c);
+            },
+            child: const Text('Detalhes'),
           ),
         ],
       ),
