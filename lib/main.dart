@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -1175,30 +1176,90 @@ class _HomePageState extends State<HomePage> {
         }
       }
       if (urlDownload == null || !mounted) return;
-      showDialog(
+      final doBaixar = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           title: const Text('Atualização disponível'),
-          content: const Text('Nova versão disponível para download.'),
+          content: Text('Versão $versaoRemota disponível. Deseja instalar agora?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Agora não'),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Depois'),
             ),
             FilledButton.icon(
-              onPressed: () async {
-                await launchUrl(Uri.parse(urlDownload!),
-                    mode: LaunchMode.externalApplication);
-                Navigator.pop(ctx);
-              },
-              icon: const Icon(Icons.download, size: 18),
-              label: const Text('Baixar'),
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.system_update, size: 18),
+              label: const Text('Instalar'),
             ),
           ],
         ),
       );
+      if (doBaixar != true || !mounted) return;
+      await _baixarEInstalar(urlDownload, versaoRemota);
     } catch (_) {}
+  }
+
+  Future<void> _baixarEInstalar(String url, String versao) async {
+    if (!mounted) return;
+    final downloadController = ValueNotifier<double>(0.0);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Baixando atualização...'),
+            const SizedBox(height: 16),
+            ValueListenableBuilder<double>(
+              valueListenable: downloadController,
+              builder: (_, pct, __) => Column(
+                children: [
+                  LinearProgressIndicator(value: pct / 100),
+                  const SizedBox(height: 8),
+                  Text('${pct.toStringAsFixed(0)}%'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    try {
+      final tempDir = Directory.systemTemp;
+      final filePath = '${tempDir.path}/atualizacao_$versao.apk';
+      final file = File(filePath);
+      final request = await HttpClient().getUrl(Uri.parse(url));
+      final response = await request.close();
+      final totalBytes = response.contentLength;
+      int receivedBytes = 0;
+      final sink = file.openWrite();
+      await for (final chunk in response) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        if (totalBytes > 0) {
+          downloadController.value = (receivedBytes / totalBytes) * 100;
+        }
+      }
+      await sink.flush();
+      await sink.close();
+      if (mounted) Navigator.of(context).pop();
+      final result = await OpenFile.open(filePath,
+          type: 'application/vnd.android.package-archive');
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao abrir instalador: ${result.message}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao baixar atualização: $e')),
+        );
+      }
+    }
   }
 
   bool _versaoMaior(String a, String b) {
