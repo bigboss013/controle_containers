@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -1139,6 +1142,76 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _carregarDados();
     _carregarClientes();
+    _verificarAtualizacao();
+  }
+
+  Future<void> _verificarAtualizacao() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final versaoAtual = info.version;
+      final client = HttpClient();
+      final request = await client.getUrl(
+        Uri.parse('https://api.github.com/repos/bigboss013/controle_containers/releases/latest'),
+      );
+      request.headers.set('Accept', 'application/vnd.github.v3+json');
+      request.headers.set('User-Agent', 'controle_containers');
+      final response = await request.close();
+      if (response.statusCode != 200) return;
+      final body = await response.transform(utf8.decoder).join();
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final tag = data['tag_name'] as String?;
+      if (tag == null) return;
+      final versaoRemota = tag.replaceAll(RegExp(r'[vV]'), '').split('+')[0];
+      if (!_versaoMaior(versaoRemota, versaoAtual)) return;
+      String? urlDownload;
+      final assets = data['assets'] as List<dynamic>?;
+      if (assets != null) {
+        for (final asset in assets) {
+          final name = asset['name'] as String?;
+          if (name != null && name.endsWith('.apk')) {
+            urlDownload = asset['browser_download_url'] as String?;
+            break;
+          }
+        }
+      }
+      if (urlDownload == null || !mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Atualização disponível'),
+          content: const Text('Nova versão disponível para download.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Agora não'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await launchUrl(Uri.parse(urlDownload!),
+                    mode: LaunchMode.externalApplication);
+                Navigator.pop(ctx);
+              },
+              icon: const Icon(Icons.download, size: 18),
+              label: const Text('Baixar'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {}
+  }
+
+  bool _versaoMaior(String a, String b) {
+    final partsA = a.split('.');
+    final partsB = b.split('.');
+    final maxLen = partsA.length > partsB.length ? partsA.length : partsB.length;
+    for (var i = 0; i < maxLen; i++) {
+      final va = i < partsA.length ? int.tryParse(partsA[i]) ?? 0 : 0;
+      final vb = i < partsB.length ? int.tryParse(partsB[i]) ?? 0 : 0;
+      if (va > vb) return true;
+      if (va < vb) return false;
+    }
+    return false;
   }
 
   Future<void> _carregarClientes() async {
