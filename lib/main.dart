@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 
@@ -163,9 +164,20 @@ class FirestoreDb {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await FirestoreDb.initDefaultData();
-  runApp(const ControleContainersApp());
+  FlutterError.onError = (details) {
+    debugPrint('FlutterError: ${details.exception}\n${details.stack}');
+  };
+  runZonedGuarded(() async {
+    try {
+      await Firebase.initializeApp();
+      await FirestoreDb.initDefaultData();
+    } catch (e) {
+      debugPrint('Erro ao inicializar Firebase: $e');
+    }
+    runApp(const ControleContainersApp());
+  }, (error, stack) {
+    debugPrint('Uncaught error: $error\n$stack');
+  });
 }
 
 class ControleContainersApp extends StatelessWidget {
@@ -394,18 +406,22 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _entrarBiometrico() async {
-    final autenticado = await _localAuth.authenticate(
-      localizedReason: 'Use a senha de desbloqueio ou biometria do aparelho',
-    );
-    if (!autenticado) return;
-    final usuario = _buscarUsuario(
-      widget.usuarioSalvoNome!,
-      widget.usuarioSalvoSenha ?? '',
-    );
-    if (usuario != null && mounted) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('usar_biometria');
-      widget.onEntrar(usuario);
+    try {
+      final autenticado = await _localAuth.authenticate(
+        localizedReason: 'Use a senha de desbloqueio ou biometria do aparelho',
+      );
+      if (!autenticado) return;
+      final usuario = _buscarUsuario(
+        widget.usuarioSalvoNome!,
+        widget.usuarioSalvoSenha ?? '',
+      );
+      if (usuario != null && mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('usar_biometria');
+        widget.onEntrar(usuario);
+      }
+    } catch (e) {
+      debugPrint('Erro na biometria: $e');
     }
   }
 
@@ -1159,10 +1175,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _verificarAtualizacao() async {
+    final client = HttpClient();
     try {
       final info = await PackageInfo.fromPlatform();
       final versaoAtual = info.version;
-      final client = HttpClient();
       final request = await client.getUrl(
         Uri.parse('https://api.github.com/repos/bigboss013/controle_containers/releases/latest'),
       );
@@ -1209,7 +1225,9 @@ class _HomePageState extends State<HomePage> {
       );
       if (doBaixar != true || !mounted) return;
       await _baixarEInstalar(urlDownload, versaoRemota);
-    } catch (_) {}
+    } catch (_) {} finally {
+      client.close();
+    }
   }
 
   Future<void> _baixarEInstalar(String url, String versao) async {
@@ -1238,10 +1256,11 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+    final client = HttpClient();
     try {
       final tempDir = Directory.systemTemp;
       final tempFile = File('${tempDir.path}/atualizacao_$versao.apk');
-      final request = await HttpClient().getUrl(Uri.parse(url));
+      final request = await client.getUrl(Uri.parse(url));
       final response = await request.close();
       final totalBytes = response.contentLength;
       int receivedBytes = 0;
@@ -1298,6 +1317,8 @@ class _HomePageState extends State<HomePage> {
           SnackBar(content: Text('Erro ao baixar atualização: $e')),
         );
       }
+    } finally {
+      client.close();
     }
   }
 
@@ -1315,13 +1336,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _carregarClientes() async {
-    _clientes.clear();
-    _clientes.addAll(await FirestoreDb.carregarClientes());
-    if (_clientes.isEmpty) {
-      _clientes.addAll([
-        Cliente(codigo: 'ALFA-001', nome: 'Alfa Logística'),
-        Cliente(codigo: 'PORTO-109', nome: 'Porto Sul'),
-      ]);
+    try {
+      _clientes.clear();
+      _clientes.addAll(await FirestoreDb.carregarClientes());
+      if (_clientes.isEmpty) {
+        _clientes.addAll([
+          Cliente(codigo: 'ALFA-001', nome: 'Alfa Logística'),
+          Cliente(codigo: 'PORTO-109', nome: 'Porto Sul'),
+        ]);
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar clientes: $e');
     }
   }
 
@@ -1332,10 +1357,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _carregarDados() async {
-    _containers.clear();
-    _containers.addAll(await FirestoreDb.carregarContainers());
-    _movimentos.clear();
-    _movimentos.addAll(await FirestoreDb.carregarMovimentos());
+    try {
+      _containers.clear();
+      _containers.addAll(await FirestoreDb.carregarContainers());
+    } catch (e) {
+      debugPrint('Erro ao carregar containers: $e');
+    }
+    try {
+      _movimentos.clear();
+      _movimentos.addAll(await FirestoreDb.carregarMovimentos());
+    } catch (e) {
+      debugPrint('Erro ao carregar movimentos: $e');
+    }
 
     if (_containers.isEmpty) {
       final usuarioNome = widget.usuario.nome;
@@ -1379,11 +1412,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _salvarDados() async {
-    for (final c in _containers) {
-      await FirestoreDb.salvarContainer(c);
-    }
-    for (final m in _movimentos) {
-      await FirestoreDb.registrarMovimento(m);
+    try {
+      for (final c in _containers) {
+        await FirestoreDb.salvarContainer(c);
+      }
+      for (final m in _movimentos) {
+        await FirestoreDb.registrarMovimento(m);
+      }
+    } catch (e) {
+      debugPrint('Erro ao salvar dados: $e');
     }
   }
 
@@ -3025,6 +3062,11 @@ class ContainerCard extends StatelessWidget {
                     height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 130,
+                      color: Colors.grey.shade200,
+                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                    ),
                   ),
                 ),
               ],
@@ -3219,6 +3261,11 @@ class ContainerCard extends StatelessWidget {
                     height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 120,
+                      color: Colors.grey.shade200,
+                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                    ),
                   ),
                 ),
               ],
@@ -5031,11 +5078,10 @@ class _EntradaPageState extends State<EntradaPage> {
     );
     if (foto == null || !mounted) return;
     setState(() => _isScanning = true);
+    final recognizer = TextRecognizer();
     try {
       final inputImage = InputImage.fromFilePath(foto.path);
-      final recognizer = TextRecognizer();
       final recognisedText = await recognizer.processImage(inputImage);
-      await recognizer.close();
       if (!mounted) return;
       final codigoRegex = RegExp(r'[A-Z]{4}\d{7}');
       for (final block in recognisedText.blocks) {
@@ -5062,6 +5108,8 @@ class _EntradaPageState extends State<EntradaPage> {
           SnackBar(content: Text('Erro ao ler imagem: $e')),
         );
       }
+    } finally {
+      await recognizer.close();
     }
   }
 
@@ -5422,6 +5470,11 @@ class _EntradaPageState extends State<EntradaPage> {
                     height: 150,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 150,
+                      color: Colors.grey.shade200,
+                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                    ),
                   ),
                 ),
               ],
