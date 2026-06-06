@@ -3,27 +3,31 @@ const Auth = {
 
   async login(nome, senha) {
     try {
-      const snap = await db.collection('usuarios').get();
-      console.log('Usuarios encontrados:', snap.size);
-      for (const doc of snap.docs) {
+      const docRef = db.collection('usuarios').doc(nome);
+      const doc = await docRef.get();
+      if (doc.exists) {
         const d = doc.data();
-        console.log('Doc:', doc.id, '->', JSON.stringify(d));
-        const docName = d.nome || doc.id;
-        const docSenha = d.senha || '';
-        if (docName && docName.toLowerCase() === nome.toLowerCase() && docSenha === senha) {
-          this.currentUser = { nome: docName, perfil: d.perfil || 'gate' };
+        if (d.senha === senha) {
+          this.currentUser = { nome: doc.id, perfil: d.perfil || 'gate' };
           localStorage.setItem('user', JSON.stringify(this.currentUser));
           return this.currentUser;
         }
       }
-      console.log('Nenhum match para:', nome);
+
+      const snap = await db.collection('usuarios').get();
+      for (const d of snap.docs) {
+        const data = d.data();
+        const docName = data.nome || d.id;
+        if (docName.toLowerCase() === nome.toLowerCase() && (data.senha || '') === senha) {
+          this.currentUser = { nome: docName, perfil: data.perfil || 'gate' };
+          localStorage.setItem('user', JSON.stringify(this.currentUser));
+          return this.currentUser;
+        }
+      }
       return null;
     } catch (e) {
-      console.error('Erro login Firestore:', e.code, e.message);
-      if (e.code === 'permission-denied') {
-        throw new Error('Sem permissão para acessar dados. Verifique as regras do Firestore.');
-      }
-      throw new Error('Erro de conexão: ' + e.message);
+      console.error('Erro login:', e);
+      throw new Error('Erro de conexão: ' + (e.message || e.code));
     }
   },
 
