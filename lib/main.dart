@@ -909,7 +909,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<UserRole>(
-                value: _perfil,
+                initialValue: _perfil,
                 decoration: const InputDecoration(
                   labelText: 'Perfil',
                   prefixIcon: Icon(Icons.admin_panel_settings_outlined),
@@ -1244,7 +1244,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 16),
             ValueListenableBuilder<double>(
               valueListenable: downloadController,
-              builder: (_, pct, __) => Column(
+              builder: (_, pct, _) => Column(
                 children: [
                   LinearProgressIndicator(value: pct / 100),
                   const SizedBox(height: 8),
@@ -2256,7 +2256,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: tipo,
+                      initialValue: tipo,
                       decoration: const InputDecoration(
                         labelText: 'Tipo', border: OutlineInputBorder(),
                         isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -3062,7 +3062,7 @@ class ContainerCard extends StatelessWidget {
                     height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (a, b, c) => Container(
                       height: 130,
                       color: Colors.grey.shade200,
                       child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
@@ -3261,7 +3261,7 @@ class ContainerCard extends StatelessWidget {
                     height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 120,
                       color: Colors.grey.shade200,
                       child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
@@ -3769,7 +3769,7 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               scrollDirection: Axis.horizontal,
               itemCount: _blocos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final b = _blocos[i];
                 final selected = _blocoFiltro == b;
@@ -4027,7 +4027,7 @@ class _MapaVirtualPageState extends State<MapaVirtualPage> {
                                                       child: Text(
                                                         isEmpty
                                                             ? '-'
-                                                            : '${c.codigo.substring(c.codigo.length > 4 ? c.codigo.length - 4 : 0)}',
+                                                            : c.codigo.substring(c.codigo.length > 4 ? c.codigo.length - 4 : 0),
                                                         style: TextStyle(
                                                           fontSize: isEmpty
                                                               ? 10
@@ -4407,7 +4407,7 @@ class IaOtimizacao {
         .length;
     if (totalContainers == 0) return 100;
     final penalidade = conflitos.fold<int>(
-        0, (sum, c) => sum + c.severidade * 10);
+        0, (total, c) => total + c.severidade * 10);
     final score = 100 - penalidade;
     return score.clamp(0, 100);
   }
@@ -4484,7 +4484,9 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
             _processarComandoVoz(result.recognizedWords);
           }
         },
-        listenMode: stt.ListenMode.dictation,
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+        ),
       );
     }
   }
@@ -4805,7 +4807,7 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
         children: [
           AnimatedBuilder(
             animation: _animController!,
-            builder: (_, __) {
+            builder: (_, _) {
               final progress = _animController!.value;
               return Column(
                 children: [
@@ -5045,7 +5047,7 @@ class _EntradaPageState extends State<EntradaPage> {
           FilledButton(
             onPressed: () {
               if (codCtrl.text.trim().isEmpty ||
-                  nomeCtrl.text.trim().isEmpty) return;
+                  nomeCtrl.text.trim().isEmpty) { return; }
               widget.onCadastrarCliente(Cliente(
                 codigo: codCtrl.text.trim().toUpperCase(),
                 nome: nomeCtrl.text.trim(),
@@ -5227,13 +5229,13 @@ class _EntradaPageState extends State<EntradaPage> {
         final isCheio = peso != null && peso > 0;
         String tipo = cell(colTipo).toUpperCase();
         if (!['20', '40', 'REEFER', 'OPEN TOP', 'FLAT RACK', 'TANK'].contains(tipo)) {
-          if (tipo.contains('20')) tipo = '20';
-          else if (tipo.contains('REEFER') || tipo.contains('REFR')) tipo = 'Reefer';
-          else if (tipo.contains('OPEN') || tipo.contains('TOP')) tipo = 'Open Top';
-          else if (tipo.contains('FLAT') || tipo.contains('RACK')) tipo = 'Flat Rack';
-          else if (tipo.contains('TANK')) tipo = 'Tank';
-          else if (tipo.contains('40')) tipo = '40';
-          else tipo = '20';
+          if (tipo.contains('20')) { tipo = '20'; }
+          else if (tipo.contains('REEFER') || tipo.contains('REFR')) { tipo = 'Reefer'; }
+          else if (tipo.contains('OPEN') || tipo.contains('TOP')) { tipo = 'Open Top'; }
+          else if (tipo.contains('FLAT') || tipo.contains('RACK')) { tipo = 'Flat Rack'; }
+          else if (tipo.contains('TANK')) { tipo = 'Tank'; }
+          else if (tipo.contains('40')) { tipo = '40'; }
+          else { tipo = '20'; }
         }
         if (tipo == 'REEFER') tipo = 'Reefer';
         if (tipo == 'FLAT RACK') tipo = 'Flat Rack';
@@ -5418,7 +5420,7 @@ class _EntradaPageState extends State<EntradaPage> {
               ],
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: _tipo,
+                initialValue: _tipo,
                 style: const TextStyle(fontSize: 18, color: Colors.black87),
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
@@ -5470,7 +5472,7 @@ class _EntradaPageState extends State<EntradaPage> {
                     height: 150,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 150,
                       color: Colors.grey.shade200,
                       child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
@@ -6062,7 +6064,7 @@ class DeadlinePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: tipo,
+                        initialValue: tipo,
                         decoration: const InputDecoration(
                           labelText: 'Tipo', border: OutlineInputBorder(),
                           isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -6333,7 +6335,7 @@ String normalizarPosicao(String pos) {
   if (match == null) return p;
   final letters = match.group(1)!;
   final digits = match.group(2)!;
-  if (digits.length == 2) return '$letters-${digits}';
+  if (digits.length == 2) return '$letters-$digits';
   if (digits.length == 3) return '$letters${digits[0]}-${digits.substring(1)}';
   return p;
 }
