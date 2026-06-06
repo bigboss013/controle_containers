@@ -3,8 +3,7 @@ const Auth = {
 
   async login(nome, senha) {
     try {
-      const docRef = db.collection('usuarios').doc(nome);
-      const doc = await docRef.get();
+      const doc = await db.collection('usuarios').doc(nome).get();
       if (doc.exists) {
         const d = doc.data();
         if (d.senha === senha) {
@@ -12,22 +11,33 @@ const Auth = {
           localStorage.setItem('user', JSON.stringify(this.currentUser));
           return this.currentUser;
         }
-      }
-
-      const snap = await db.collection('usuarios').get();
-      for (const d of snap.docs) {
-        const data = d.data();
-        const docName = data.nome || d.id;
-        if (docName.toLowerCase() === nome.toLowerCase() && (data.senha || '') === senha) {
-          this.currentUser = { nome: docName, perfil: data.perfil || 'gate' };
-          localStorage.setItem('user', JSON.stringify(this.currentUser));
-          return this.currentUser;
-        }
+        return null;
       }
       return null;
     } catch (e) {
-      console.error('Erro login:', e);
-      throw new Error('Erro de conexão: ' + (e.message || e.code));
+      console.warn('Firestore login failed, trying REST:', e.message);
+      return this._loginRest(nome, senha);
+    }
+  },
+
+  async _loginRest(nome, senha) {
+    const url = `https://firestore.googleapis.com/v1/projects/santos-transportes/databases/(default)/documents/usuarios/${nome}`;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return null;
+      const doc = await resp.json();
+      const fields = doc.fields || {};
+      const dbSenha = fields.senha?.stringValue || '';
+      const dbPerfil = fields.perfil?.stringValue || 'gate';
+      if (dbSenha === senha) {
+        this.currentUser = { nome: doc.name.split('/').pop(), perfil: dbPerfil };
+        localStorage.setItem('user', JSON.stringify(this.currentUser));
+        return this.currentUser;
+      }
+      return null;
+    } catch (e) {
+      console.error('REST login also failed:', e);
+      throw new Error('Não foi possível conectar ao servidor.');
     }
   },
 
