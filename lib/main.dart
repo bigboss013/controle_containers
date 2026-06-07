@@ -268,9 +268,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _carregarDadosLogin() async {
-    final prefs = await SharedPreferences.getInstance();
-    _usuarioSalvoNome = prefs.getString('usuario_salvo_nome');
-    _usuarioSalvoSenha = prefs.getString('usuario_salvo_senha');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _usuarioSalvoNome = prefs.getString('usuario_salvo_nome');
+      _usuarioSalvoSenha = prefs.getString('usuario_salvo_senha');
+    } catch (e) {
+      debugPrint('Erro ao carregar dados login: $e');
+    }
   }
 
   Future<void> _carregarUsuarios() async {
@@ -464,13 +468,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _salvarCredenciais() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_salvarUsuario) {
-      await prefs.setString('usuario_salvo_nome', _nomeController.text.trim());
-      await prefs.setString('usuario_salvo_senha', _senhaController.text);
-    } else {
-      await prefs.remove('usuario_salvo_nome');
-      await prefs.remove('usuario_salvo_senha');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_salvarUsuario) {
+        await prefs.setString('usuario_salvo_nome', _nomeController.text.trim());
+        await prefs.setString('usuario_salvo_senha', _senhaController.text);
+      } else {
+        await prefs.remove('usuario_salvo_nome');
+        await prefs.remove('usuario_salvo_senha');
+      }
+    } catch (e) {
+      debugPrint('Erro ao salvar credenciais: $e');
     }
   }
 
@@ -1292,7 +1300,7 @@ class _HomePageState extends State<HomePage> {
       await sink.flush();
       await sink.close();
       if (!mounted) return;
-      Navigator.of(context).pop();
+      try { Navigator.of(context).pop(); } catch (_) {}
       final dirResult = await FilePicker.platform.getDirectoryPath(
         dialogTitle: 'Salvar APK em:',
         lockParentWindow: false,
@@ -1328,14 +1336,15 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
+      try { if (mounted) Navigator.of(context).pop(); } catch (_) {}
       if (mounted) {
-        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao baixar atualização: $e')),
         );
       }
     } finally {
       client.close();
+      downloadController.dispose();
     }
   }
 
@@ -1637,10 +1646,12 @@ class _HomePageState extends State<HomePage> {
               final novaPos = normalizarPosicao(posController.text);
               if (novaPos.isEmpty) return;
               item.posicao = novaPos;
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Posição alterada para $novaPos.')),
-              );
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Posição alterada para $novaPos.')),
+                );
+                Navigator.pop(ctx);
+              }
             },
             child: const Text('Salvar'),
           ),
@@ -2466,7 +2477,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 highlightCodigo: container.codigo,
                 onContainerTap: (c) {
                   Navigator.pop(ctx);
-                  _abrirDetalhesContainer(context, c);
+                  if (mounted) _abrirDetalhesContainer(context, c);
                 },
               ),
             ),
@@ -2488,7 +2499,7 @@ class _DashboardPageState extends State<DashboardPage> {
           containers: yard,
           onContainerTap: (c) {
             Navigator.pop(context);
-            _abrirDetalhesContainer(context, c);
+            if (mounted) _abrirDetalhesContainer(context, c);
           },
         ),
       ),
@@ -4490,37 +4501,50 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _iniciarSpeech() async {
-    await _speech.initialize(
-      onError: (e) { if (mounted) setState(() => _escutando = false); },
-      onStatus: (s) {
-        if (s == 'done' || s == 'notListening') {
-          if (mounted) setState(() => _escutando = false);
-        }
-      },
-    );
+    try {
+      await _speech.initialize(
+        onError: (e) { if (mounted) setState(() => _escutando = false); },
+        onStatus: (s) {
+          if (s == 'done' || s == 'notListening') {
+            if (mounted) setState(() => _escutando = false);
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('Erro ao inicializar speech: $e');
+    }
   }
 
   Future<void> _alternarMicrofone() async {
     if (_escutando) {
-      await _speech.stop();
+      try {
+        await _speech.stop();
+      } catch (e) {
+        debugPrint('Erro ao parar speech: $e');
+      }
       if (mounted) setState(() => _escutando = false);
     } else {
       setState(() {
         _escutando = true;
         _textoReconhecido = '';
       });
-      await _speech.listen(
-        onResult: (result) {
-          if (!mounted) return;
-          setState(() => _textoReconhecido = result.recognizedWords);
-          if (result.finalResult) {
-            _processarComandoVoz(result.recognizedWords);
-          }
-        },
-        listenOptions: stt.SpeechListenOptions(
-          listenMode: stt.ListenMode.dictation,
-        ),
-      );
+      try {
+        await _speech.listen(
+          onResult: (result) {
+            if (!mounted) return;
+            setState(() => _textoReconhecido = result.recognizedWords);
+            if (result.finalResult) {
+              _processarComandoVoz(result.recognizedWords);
+            }
+          },
+          listenOptions: stt.SpeechListenOptions(
+            listenMode: stt.ListenMode.dictation,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Erro ao iniciar speech: $e');
+        if (mounted) setState(() => _escutando = false);
+      }
     }
   }
 
@@ -5098,23 +5122,27 @@ class _EntradaPageState extends State<EntradaPage> {
   }
 
   Future<void> _tirarFotoAvaria() async {
-    final foto = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (foto == null || !mounted) return;
-    setState(() => _fotoAvariaPath = foto.path);
+    try {
+      final foto = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (foto == null || !mounted) return;
+      setState(() => _fotoAvariaPath = foto.path);
+    } catch (e) {
+      debugPrint('Erro ao tirar foto: $e');
+    }
   }
 
   Future<void> _scanContainerCode() async {
-    final foto = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
-    if (foto == null || !mounted) return;
-    setState(() => _isScanning = true);
     final recognizer = TextRecognizer();
     try {
+      final foto = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (foto == null || !mounted) return;
+      setState(() => _isScanning = true);
       final inputImage = InputImage.fromFilePath(foto.path);
       final recognisedText = await recognizer.processImage(inputImage);
       if (!mounted) return;
@@ -5756,11 +5784,13 @@ class HistoricoPage extends StatelessWidget {
           if (isSaida && container != null) ...[
             TextButton(
               onPressed: () {
-                Navigator.pop(ctx);
                 onRegistrarNoShow(container);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Container ${container.codigo} registrado como No-show.')),
-                );
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Container ${container.codigo} registrado como No-show.')),
+                  );
+                  Navigator.pop(ctx);
+                }
               },
               child: const Text('Registrar No-show'),
             ),
@@ -5812,10 +5842,12 @@ class HistoricoPage extends StatelessWidget {
                       if (novaPos.isEmpty) return;
                       container.posicao = novaPos;
               onReintegrar!(container);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Container ${container.codigo} retornou ao patio em $novaPos.')),
-              );
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Container ${container.codigo} retornou ao patio em $novaPos.')),
+                );
+                Navigator.pop(ctx);
+              }
             },
             child: const Text('Salvar'),
           ),
