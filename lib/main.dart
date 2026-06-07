@@ -274,10 +274,19 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _carregarUsuarios() async {
-    final loaded = await FirestoreDb.carregarUsuarios();
-    if (loaded.isEmpty) {
-      await FirestoreDb.initDefaultData();
+    List<AppUser> loaded = [];
+    try {
       loaded.addAll(await FirestoreDb.carregarUsuarios());
+    } catch (e) {
+      debugPrint('Erro ao carregar usuarios: $e');
+    }
+    if (loaded.isEmpty) {
+      try {
+        await FirestoreDb.initDefaultData();
+        loaded.addAll(await FirestoreDb.carregarUsuarios());
+      } catch (e) {
+        debugPrint('Erro ao init default data: $e');
+      }
     }
     if (!mounted) return;
     setState(() {

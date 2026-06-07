@@ -60,6 +60,10 @@ android {
             isShrinkResources = false
         }
     }
+
+    dexOptions {
+        javaMaxHeapSize = "2g"
+    }
 }
 
 flutter {
