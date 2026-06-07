@@ -298,8 +298,12 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _salvarUsuarios(List<AppUser> usuarios) async {
-    for (final u in usuarios) {
-      await FirestoreDb.salvarUsuario(u);
+    try {
+      for (final u in usuarios) {
+        await FirestoreDb.salvarUsuario(u);
+      }
+    } catch (e) {
+      debugPrint('Erro ao salvar usuarios: $e');
     }
   }
 
@@ -309,7 +313,11 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _excluirUsuario(String nome) async {
-    await FirestoreDb.removerUsuario(nome);
+    try {
+      await FirestoreDb.removerUsuario(nome);
+    } catch (e) {
+      debugPrint('Erro ao remover usuario: $e');
+    }
     if (!mounted) return;
     setState(() => _usuarios.removeWhere((u) => u.nome == nome));
   }
@@ -427,7 +435,7 @@ class _LoginPageState extends State<LoginPage> {
       if (usuario != null && mounted) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('usar_biometria');
-        widget.onEntrar(usuario);
+        if (mounted) widget.onEntrar(usuario);
       }
     } catch (e) {
       debugPrint('Erro na biometria: $e');
@@ -1360,8 +1368,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _salvarClientes() async {
-    for (final c in _clientes) {
-      await FirestoreDb.salvarCliente(c);
+    try {
+      for (final c in _clientes) {
+        await FirestoreDb.salvarCliente(c);
+      }
+    } catch (e) {
+      debugPrint('Erro ao salvar clientes: $e');
     }
   }
 
@@ -1434,7 +1446,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _limparDados() async {
-    await FirestoreDb.limparTudo();
+    try {
+      await FirestoreDb.limparTudo();
+    } catch (e) {
+      debugPrint('Erro ao limpar dados: $e');
+    }
     if (!mounted) return;
     setState(() {
       _containers.clear();
@@ -1653,7 +1669,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _excluirContainer(ContainerItem item) async {
-    await FirestoreDb.removerContainer(item.codigo);
+    try {
+      await FirestoreDb.removerContainer(item.codigo);
+    } catch (e) {
+      debugPrint('Erro ao remover container: $e');
+    }
     if (!mounted) return;
     setState(() {
       _containers.removeWhere((c) => c.codigo == item.codigo);
@@ -1678,7 +1698,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _limparHistorico() async {
-    await FirestoreDb.limparHistorico();
+    try {
+      await FirestoreDb.limparHistorico();
+    } catch (e) {
+      debugPrint('Erro ao limpar historico: $e');
+    }
     if (!mounted) return;
     setState(() {
       _movimentos.clear();
@@ -2322,7 +2346,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                     ? TimeOfDay.fromDateTime(deadline!)
                                     : const TimeOfDay(hour: 18, minute: 0),
                               );
-                              if (time == null) return;
+                              if (time == null || !ctx.mounted) return;
                               setDialogState(() {
                                 deadline = DateTime(
                                   date.year, date.month, date.day, time.hour, time.minute,
@@ -2739,7 +2763,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       firstDate: DateTime.now(),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
-                    if (date != null) {
+                    if (date != null && ctx.mounted) {
                       setDialogState(() => dataAgendamento = date);
                     }
                   },
@@ -2762,7 +2786,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       context: ctx,
                       initialTime: horaAgendamento,
                     );
-                    if (time != null) {
+                    if (time != null && ctx.mounted) {
                       setDialogState(() => horaAgendamento = time);
                     }
                   },
@@ -4467,7 +4491,7 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
 
   Future<void> _iniciarSpeech() async {
     await _speech.initialize(
-      onError: (e) => setState(() => _escutando = false),
+      onError: (e) { if (mounted) setState(() => _escutando = false); },
       onStatus: (s) {
         if (s == 'done' || s == 'notListening') {
           if (mounted) setState(() => _escutando = false);
@@ -4479,7 +4503,7 @@ class _IaPageState extends State<IaPage> with SingleTickerProviderStateMixin {
   Future<void> _alternarMicrofone() async {
     if (_escutando) {
       await _speech.stop();
-      setState(() => _escutando = false);
+      if (mounted) setState(() => _escutando = false);
     } else {
       setState(() {
         _escutando = true;
@@ -6130,7 +6154,7 @@ class DeadlinePage extends StatelessWidget {
                                       ? TimeOfDay.fromDateTime(deadline!)
                                       : const TimeOfDay(hour: 18, minute: 0),
                                 );
-                                if (time == null) return;
+                                if (time == null || !ctx.mounted) return;
                                 setDialogState(() {
                                   deadline = DateTime(
                                     date.year, date.month, date.day, time.hour, time.minute,
